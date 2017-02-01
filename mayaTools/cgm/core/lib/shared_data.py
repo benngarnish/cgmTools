@@ -6,6 +6,29 @@ email: jjburton@cgmonks.com
 Website : http://www.cgmonks.com
 ------------------------------------------
 """
+#>>> Attributes
+#==================================================================
+_d_attrCategoryLists = {'transform':('translateX','translateY','translateZ',
+                                     'rotateX','rotateY','rotateZ',
+                                     'scaleX','scaleY','scaleZ','visibility'),
+                        'joint':('rotateOrder','rotateAxisX','rotateAxisY','rotateAxisZ',
+                                 'inheritsTransform','drawStyle','radius',
+                                 'jointTypeX','jointTypeY','jointTypeZ',
+                                 'stiffnessX','stiffnessY','stiffnessZ',
+                                 'preferredAngleX','preferredAngleY','preferredAngleZ',
+                                 'jointOrientX','jointOrientY','jointOrientZ','segmentScaleCompensate','showManipDefault',
+                                 'displayHandle','displayLocalAxis','selectHandleX','selectHandleY','selectHandleZ'),
+                        'objectDisplayAttrs':('visibility','template','lodVisibility'),
+                        'curveShapeAttrs':('intermediateObject','dispCV','dispEP','dispHull','dispGeometry'),
+                        'locatorShape':('localPositionX','localPositionY','localPositionZ',
+                                        'localScaleX','localScaleY','localScaleZ'),
+                        'overrideAttrs':('overrideEnabled','overrideDisplayType',
+                                         'overrideLevelOfDetail','overrideShading',
+                                         'overrideTexturing','overridePlayback',
+                                         'overrideVisibility','overrideColor')}
+_d_attrTypes_toShort = {'matrix':'mtrx','float':'fl','double':'d','double3':'d3','string':'str','long':'int','float3':'fl3',
+                        'message':'msg','doubleLinear':'dl','doubleAngle':'da','TdataCompound':'Tdata'}
+
 #>>> Naming
 #==================================================================
 _d_node_to_suffix = {'follicle':'foll','curveInfo':'crvInfo','condition':'condNode','multiplyDivide':'mdNode','pointOnSurfaceInfo':'posInfoNode','closestPointOnSurface':'cPntOnSurfNode','closestPointOnMesh':'cPntOnMeshNode','plusMinusAverage':'pmAvNode','frameCache':'fCacheNode'}
@@ -18,7 +41,6 @@ _d_rotateOrder_from_index = {0: 'xyz', 1: 'yzx', 2: 'zxy', 3: 'xzy', 4: 'yxz', 5
 
 _d_pivotArgs = {'rp':['rp','r','rotate','rotatePivot','pivot'],'sp':['scale','s','scalePivot'],'boundingBox':['bb','bbCenter'],'closestPoint':['cpos','closest','closestPoint']}
 _d_spaceArgs = {'object':['os','objectSpace','local','o'],'world':['w','worldSpace','ws']}
-
 
 
 

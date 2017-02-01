@@ -19,7 +19,7 @@ log.setLevel(logging.INFO)
 
 # From Maya =============================================================
 import maya.cmds as mc
-
+import maya.mel as mel
 # From Red9 =============================================================
 
 # From cgm ==============================================================
@@ -31,49 +31,11 @@ from cgm.core.lib import name_utils as NAME
 
 from cgm.lib import attributes
 
+from cgm.lib import lists
 #>>> Utilities
 #===================================================================   
-def is_shape(node = None):
-    """
-    Check to see if an node is a shape
-    
-    :parameters:
-        node(str): Object to check
-
-    :returns
-        status(bool)
-    """   
-    _str_func = 'is_shape'
-    _node = coreValid.stringArg(node,False,_str_func)
-    log.debug("|{0}| >> node: '{1}' ".format(_str_func,_node))    
-    
-    _shape = mc.ls(node,type='shape',long=True)
-    if _shape:
-        if len(_shape) == 1:
-            if _shape[0] == NAME.get_long(_node):
-                return True
-    return False
-    
-def is_transform(node = None):
-    """
-    Is an node a transform?
-    
-    :parameters:
-        node(str): Object to check
-
-    :returns
-        status(bool)
-    """   
-    _str_func = 'is_transform'
-    _node = coreValid.stringArg(node,False,_str_func) 
-    log.debug("|{0}| >> node: '{1}' ".format(_str_func,_node))    
-    
-    buffer = mc.ls(_node,type = 'transform',long = True)
-    if buffer and buffer[0]==NAME.get_long(_node):
-        return True
-    if not mc.objExists(_node):
-        log.error("|{0}| >> node: '{1}' doesn't exist".format(_str_func,_node))    
-    return False
+is_shape = coreValid.is_shape
+is_transform = coreValid.is_transform    
 
 def get_transform(node = None):
     """
@@ -93,13 +55,13 @@ def get_transform(node = None):
     else:
         _buffer = node
         
-    _buffer = mc.ls(_buffer, type = 'transform') or False
+    _buffer = mc.ls(_buffer, type = 'transform',long = True) or False
     if _buffer:
-        return _buffer[0]
+        return NAME.get_short(_buffer[0])
     else:
-        _buffer = mc.listRelatives(node,parent=True,type='transform') or False
+        _buffer = mc.listRelatives(node,parent=True,type='transform',fullPath = True) or False
     if _buffer:
-        return _buffer[0]
+        return NAME.get_short(_buffer[0])
     return False    
 
 def get_tag(node = None, tag = None):
@@ -121,7 +83,7 @@ def get_tag(node = None, tag = None):
             returnBuffer = attributes.returnMessageData(_node,tag,False)
             if not returnBuffer:
                 return False
-            elif get_mayaType(returnBuffer[0]) == 'reference':
+            elif coreValid.get_mayaType(returnBuffer[0]) == 'reference':
                 if attributes.repairMessageToReferencedTarget(_node,tag):
                     return attributes.returnMessageData(_node,tag,False)[0]
                 return returnBuffer[0]
@@ -164,7 +126,93 @@ def get_all_parents(node = None, shortNames = True):
     if shortNames:
         return [NAME.get_short(o) for o in _l_parents]
     return _l_parents 
+
+def get_timeline_dict():
+    """
+    Returns timeline info as a dictionary
     
+    :returns
+        dict :: currentTime,sceneStart,sceneEnd,rangeStart,rangeEnd
+    """   
+    _str_func = 'get_timeline_dict'
+    returnDict = {}
+    returnDict['currentTime'] = mc.currentTime(q=True)
+    returnDict['sceneStart'] = mc.playbackOptions(q=True,animationStartTime=True)
+    returnDict['sceneEnd'] = mc.playbackOptions(q=True,animationEndTime=True)
+    returnDict['rangeStart'] = mc.playbackOptions(q=True,min=True)
+    returnDict['rangeEnd'] = mc.playbackOptions(q=True,max=True)
+
+    return returnDict    
+
+def get_key_indices_from(obj = None):
+    """
+    Return a list of the time indexes of the keyframes on an object
+    
+    :returns
+        list of keys(list)
+    """ 
+    _str_func = 'get_key_indices'
+    
+    initialTimeState = mc.currentTime(q=True)
+    keyFrames = []
+
+    firstKey = mc.findKeyframe(obj,which = 'first')
+    lastKey = mc.findKeyframe(obj,which = 'last')
+
+    keyFrames.append(firstKey)
+    mc.currentTime(firstKey)
+    while mc.currentTime(q=True) != lastKey:
+        keyBuffer = mc.findKeyframe(obj,which = 'next')
+        keyFrames.append(keyBuffer)
+        mc.currentTime(keyBuffer)
+
+    keyFrames.append(lastKey)
+
+    # Put the time back where we found it
+    mc.currentTime(initialTimeState)
+
+    return lists.returnListNoDuplicates(keyFrames)   
+
+def get_selectedFromChannelBox(attributesOnly = False):
+    """ 
+    Returns a list of selected object attributes from the channel box
+    
+    :parameters:
+        attributesOnly(bool): Whether you want
+        
+    Keyword arguments:
+    returnRaw() -- whether you just want channels or objects combined with selected attributes
+
+    """    
+    _sel = mc.ls(sl=True)
+    ChannelBoxName = mel.eval('$tmp = $gChannelBoxName');
+
+    sma = mc.channelBox(ChannelBoxName, query=True, sma=True)
+    ssa = mc.channelBox(ChannelBoxName, query=True, ssa=True)
+    sha = mc.channelBox(ChannelBoxName, query=True, sha=True)
+    soa = mc.channelBox(ChannelBoxName, query=True, soa=True)
+
+
+    channels = []
+    if sma:
+        channels.extend(sma)
+    if ssa:
+        channels.extend(ssa)
+    if sha:
+        channels.extend(sha)
+    if soa:
+        channels.extend(soa)
+
+    if channels and _sel:
+        if attributesOnly:
+            return channels
+        else:
+            _res = []
+            for item in _sel:
+                for attr in channels:
+                    _res.append("{0}.{1}".format(item,attr))
+            return _res
+    return False 
 
 
 

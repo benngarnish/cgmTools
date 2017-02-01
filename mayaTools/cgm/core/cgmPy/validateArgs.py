@@ -23,6 +23,7 @@ import maya.mel as mel
 from cgm.core import cgm_General as cgmGeneral
 from cgm.core.lib import shared_data as SHARED
 reload(SHARED)
+from cgm.core.lib import name_utils as NAME
 # Shared Defaults ========================================================
 
 #=========================================================================
@@ -97,7 +98,7 @@ def get_mayaType(node = None):
         _root = _split[0]
         _compType = _split[1]
         
-        log.info("|{0}| >> split: {1} | root: {2} | comp: {3}".format(_str_func,_split,_root,_compType))
+        log.debug("|{0}| >> split: {1} | root: {2} | comp: {3}".format(_str_func,_split,_root,_compType))
         if 'vtx' == _compType:
             return 'polyVertex'
 
@@ -128,6 +129,7 @@ def get_mayaType(node = None):
         
         raise RuntimeError,"Shouldn't have gotten here. Need another check for component type. '{0}'".format(_node)
     return _intialCheck
+
 def is_component(arg = None):
     """
     Check to see if an arg is a component
@@ -146,7 +148,28 @@ def is_component(arg = None):
         if '.' in _arg and '[' in _arg and ']' in _arg:
             return True
     return False
+
+def get_component(arg = None):
+    """
+    Check to see if an arg is a component
     
+    :parameters:
+        node(str): Object to check
+
+    :returns
+        [component, transform, componentType]
+    """       
+    _str_func = 'get_component'
+    if is_component(arg):
+        log.debug("|{0}| >> component mode...".format(_str_func))
+        _split = arg.split('[')[0].split('.')
+        _root = _split[0]
+        _compType = _split[1]
+        
+        log.info("|{0}| >> split: {1} | root: {2} | comp: {3}".format(_str_func,_split,_root,_compType))   
+        return [''.join(arg.split('.')[1:]), _root, _compType]
+    return False
+
 def isFloatEquivalent(lhs, rhs, **kwargs):
     """
     Return true if both floats are with E (epsilon) of one another, 
@@ -165,6 +188,29 @@ def isFloatEquivalent(lhs, rhs, **kwargs):
 
     return abs(lhs-rhs) <= sys.float_info.epsilon
 
+def vectorArg(arg,noneValid = True):
+    """
+    Validates a vector arg
+
+    :parameters:
+        arg 
+
+    :returns
+        arg(if valid)
+    """     
+    try:
+        if not isListArg(arg):
+            raise ValueError,"Not a list, can't be vector"
+        if len(arg) != 3:
+            raise ValueError,"Len = {0} | {1}".format(len(arg),arg)
+        for i,v in enumerate(arg):
+            if valueArg(v) is False:
+                raise ValueError,"{0} not a value.".format(v)
+        return arg
+    except Exception,err:
+        if noneValid:return False
+        raise Exception,err
+    
 def isVectorEquivalent(lhs, rhs, **kwargs):
     """
     Return true if two vectors are of equal length and have equal values.
@@ -456,18 +502,60 @@ def objString(arg=None, mayaType=None, isTransform=None, noneValid=False, called
                 raise TypeError("{3}: Arg {0} is type '{1}', expected '{2}'".format(*fmt_args))
 
     if result is None and isTransform:
-        if not mc.objectType(arg, isType="transform"):
+        if not is_transform(arg):
             if noneValid:
                 result = False
             else:
                 str_argMayaType = get_mayaType(arg)
                 fmt_args = [arg, str_argMayaType, _str_funcName]
-                raise TypeError("{2}: 'Arg {0}' is type {1}, expected 'transform'").format(*fmt_args)
+                raise TypeError("{2}: 'Arg {0}' is type {1}, expected 'transform'".format(*fmt_args))
 
     if result is None:
         result = arg
 
     return result
+
+def is_transform(node = None):
+    """
+    Is an node a transform?
+    
+    :parameters:
+        node(str): Object to check
+
+    :returns
+        status(bool)
+    """   
+    _str_func = 'is_transform'
+    _node = stringArg(node,False,_str_func) 
+    log.debug("|{0}| >> node: '{1}' ".format(_str_func,_node))    
+    
+    buffer = mc.ls(_node,type = 'transform',long = True)
+    if buffer and buffer[0]==mc.ls(_node,l=True)[0]:
+        return True
+    if not mc.objExists(_node):
+        log.error("|{0}| >> node: '{1}' doesn't exist".format(_str_func,_node))    
+    return False
+
+def is_shape(node = None):
+    """
+    Check to see if an node is a shape
+    
+    :parameters:
+        node(str): Object to check
+
+    :returns
+        status(bool)
+    """   
+    _str_func = 'is_shape'
+    _node = stringArg(node,False,_str_func)
+    log.debug("|{0}| >> node: '{1}' ".format(_str_func,_node))    
+    
+    _shape = mc.ls(node,type='shape',long=True)
+    if _shape:
+        if len(_shape) == 1:
+            if _shape[0] == NAME.get_long(_node):
+                return True
+    return False
 
 def objStringList(l_args=None, mayaType=None, noneValid=False, isTransform=False, calledFrom = None, **kwargs):
     """
@@ -492,7 +580,9 @@ def objStringList(l_args=None, mayaType=None, noneValid=False, isTransform=False
     if not isinstance(l_args, (list, tuple)):l_args = [l_args]
 
     for arg in l_args:
-        tmp = objString(arg, mayaType, noneValid, isTransform)
+        try:arg = arg.mNode
+        except:pass
+        tmp = objString(arg, mayaType,isTransform, noneValid)
         if tmp != False:
             result.append(tmp)
         else:
