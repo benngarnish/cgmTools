@@ -32,12 +32,48 @@ _l_requiredModuleDat = ['__version__',
                         'prerig','is_prerig','prerigDelete',
                         'rig','is_rig','rigDelete']
 
+
+_l_buildProfiles = 'unityLow','unityMed','unityHigh','unityToon','feature'
+
+d_build_profiles = {
+    'unityLow':{'numRoll':0,
+                'scaleSetup':False,
+                'squashMeasure':0,
+                'squash':0,
+                   },
+    'unityMed':{'numRoll':1,
+                'scaleSetup':False,
+                'squashMeasure':0,
+                'squash':0,
+               },
+    'unityHigh':{'numRoll':3,
+                 'scaleSetup':False,
+                 'squashMeasure':0,
+                 'squash':0,
+               },
+    'unityToon':{'numRoll':3,
+                 'scaleSetup':True,
+                 'squashMeasure':'arcLength',
+                 'squash':'simple',
+               },        
+    'feature':{'numRoll':3,
+               'scaleSetup':True,
+               'squashMeasure':'arcLength',
+               'squash':'simple',
+               }
+}
+
+
+
+
+
 #These are our default attrs to make library. To be called via modules
 _d_attrsTo_make = {'side':'none:left:right:center',
-                   'position':'none:upper:lower:front:back:top:bottom',
+                   'position':'string',#'none:upper:lower:front:back:top:bottom',
                    'baseUp':'float3',
                    'baseAim':'float3',
                    'basePoint':'float3',
+                   'baseDat':'string',                   
                    'controlOffset':'float',
                    'basicShape':'circle:square:pyramid:semiSphere:sphere:cube',
                    'proxyShape':'cube:sphere:cylinder:cone:torus',
@@ -62,19 +98,23 @@ _d_attrsTo_make = {'side':'none:left:right:center',
                    'nameIter':'string',
                    'numControls':'int',
                    'numJoints':'int',
+                   'numRoll':'int',                   
                    'numShapers':'int',
                    'numSpacePivots':'int',
+                   'hasLeverJoint':'bool',
+                   'buildLeverBase':'bool',#...fkRoot is our clav like setup
+                   'hasEndJoint':'bool',                   
                    'offsetMode':'default:proxyAverage',                   
                    'buildDirect':'bool',
+                   'ikOrientToWorld':'bool',
                    'ikSetup':'none:rp:spline:ribbon',
                    'ikBase':'none:cube:simple:hips',
-                   'ikEnd':'none:bank:foot:hand:tipBase:tipEnd:tipMid:proxy',                   
-                   'buildProfile':'none:unityMobile:unityPC:humanIK:feature',
+                   'ikEnd':'none:bank:foot:paw:hand:tipBase:tipEnd:tipMid:tipCombo:proxy',
+                   'buildProfile':'none:unityLow:unityMed:humanIK:feature',
                    'buildAdditiveScale':'bool',
                    'customStartOrientation':'bool',
                    'offsetMode':'default:proxyAverage',
                    'moduleTarget':'messageSimple',
-                   
                    'squashMeasure' : 'none:arcLength:pointDist',
                    'squash' : 'none:simple:single:both',
                    'squashExtraControl' : 'bool',
@@ -83,7 +123,7 @@ _d_attrsTo_make = {'side':'none:left:right:center',
                
                    'ribbonAim': 'none:stable:stableBlend',
                    #'ribbonConnectBy': 'constraint:matrix',
-               
+                   'ribbonParam': 'fixed:floating:blend',
                    'segmentMidIKControl':'bool',
                    
                    
@@ -96,6 +136,10 @@ _d_attrsTo_make = {'side':'none:left:right:center',
 _l_pivotOrder = ['center','back','front','left','right']
 _d_pivotBankNames = {'default':{'left':'outer','right':'inner'},
                       'right':{'left':'inner','right':'outer'}}
+
+_d_mirrorAttrCheck = {'loftShape':{'widePos':'wideNeg',
+                               'wideNeg':'widePos'},
+                      'testing':{}}
 
 #>> State Attr Masks =================================================================================
 _l_attrMask_all = ['visibility']

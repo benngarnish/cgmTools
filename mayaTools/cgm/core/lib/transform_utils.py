@@ -727,7 +727,6 @@ def children_get(node = None, fullPath = False):
     """   
     _str_func = 'children_get'
     _node =  VALID.mNodeString(node)
-
     return mc.listRelatives (_node, children = True,type='transform',fullPath=fullPath) or []
 
 def descendents_get(node = None, fullPath = False):
@@ -1017,6 +1016,7 @@ vector_byAxis = MATH.get_obj_vector
 
 
 def euclidVector3Arg(arg):
+    _str_func = 'euclidVector3Arg'    
     if not issubclass(type(arg),EUCLID.Vector3):
         if VALID.isListArg(arg) and len(arg) == 3:
             return EUCLID.Vector3(float(arg[0]),float(arg[1]),float(arg[2]))

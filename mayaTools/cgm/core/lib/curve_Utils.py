@@ -7,6 +7,7 @@ www.cgmonks.com
 # From Python =============================================================
 import copy
 import re
+import pprint
 
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 import logging
@@ -24,21 +25,19 @@ from Red9.core import Red9_Meta as r9Meta
 # From cgm ==============================================================
 from cgm.core import cgm_Meta as cgmMeta
 from cgm.core import cgm_General as cgmGEN
-reload(cgmGEN)
 from cgm.core.cgmPy import validateArgs as cgmValid
-reload(cgmValid)
 from cgm.core.lib import search_utils as SEARCH
 from cgm.core.lib import rigging_utils as RIGGING
 import cgm.core.lib.transform_utils as TRANS
-reload(TRANS)
-reload(RIGGING)
 from cgm.core.lib import shape_utils as SHAPES
 from cgm.core.lib import name_utils as NAMES
 from cgm.core.lib import position_utils as POS
 from cgm.core.lib import snap_utils as SNAP
 from cgm.core.lib import distance_utils as DIST
 from cgm.core.lib import attribute_utils as ATTR
-reload(SHAPES)
+
+import cgm.core.lib.math_utils as MATH
+import cgm.core.lib.list_utils as LISTS
 from cgm.lib import (distance,
                      locators,
                      attributes,
@@ -52,7 +51,6 @@ from cgm.lib import (distance,
                      nodes,
                      joints,
                      cgmMath)
-reload(distance)
 
 #>>> Utilities
 #===================================================================    
@@ -157,12 +155,12 @@ def get_shape_info(crvShape):
         mc.connectAttr((_transform+'.worldSpace'),(_infoNode+'.inputCurve')) 
         
         _rawKnots = mc.getAttr(_infoNode + '.knots')[0]
-        #log.info( mc.getAttr(_infoNode + '.knots[*]'))
+        #log.debug( mc.getAttr(_infoNode + '.knots[*]'))
         
-        """log.info(_rawKnots)
+        """log.debug(_rawKnots)
         for knot in _rawKnots:
             #knots.append(decimal.Decimal(knot))
-            log.info(knot)
+            log.debug(knot)
             if 'e' in str(knot):
                 _knots.append('%f' % (knot))
             else:
@@ -173,7 +171,7 @@ def get_shape_info(crvShape):
             _cvs.extend(_cvs[:_degree])
             _cps.extend(_cps[:_degree])
         
-        """log.info("|{0}| >> knot info 1...".format(_str_func))
+        """log.debug("|{0}| >> knot info 1...".format(_str_func))
         if _form == 2:
             _knotInfo.append(_knots[0]-1)
         else:
@@ -185,7 +183,7 @@ def get_shape_info(crvShape):
             #i+=1
         _knotInfo.extend(_knots)
         
-        log.info("|{0}| >> knot info 2...".format(_str_func))
+        log.debug("|{0}| >> knot info 2...".format(_str_func))
         if _form == 2:
             _knotInfo.append(_knots[-1]+1)
         else:
@@ -236,13 +234,13 @@ def get_curve_shape_info(curve):
             return False
         _d = {}
         for shape in _shapes:
-            log.info("|{0}| >> shape: {1}".format(_str_func,shape))                            
+            log.debug("|{0}| >> shape: {1}".format(_str_func,shape))                            
             if cgmValid.get_mayaType(shape) == 'nurbsCurve':
                 #transform = mc.group(em=True)
                 #RIGGING.shapeParent_in_place(transform, shape)
                 #tmpShapeNode = mc.listRelatives (transform, shapes=True, fullPath=True)
                 _bfr = RIGGING.duplicate_shape(shape)
-                log.info(_bfr)
+                log.debug(_bfr)
                 _d[shape] = (get_shape_info(_bfr[1]))
                 mc.delete(_bfr[0])
                 #mc.delete(transform)
@@ -800,6 +798,71 @@ def rebuild_linear(target = None):
         
     return l_curves
 
+def join_shapes(targets = None, component = 'ep',mode='all'):
+    _str_func = 'join_shapes'    
+    
+    sel = mc.ls(sl=True)
+    if targets is None:
+        targets = sel
+    if not targets:
+        raise ValueError,"No targets specified"
+    
+    l_shapes = []
+    _len = False
+    l_mainCurves=[]
+    for o in targets:
+        _l_shapes = mc.listRelatives(o,shapes=True,fullPath=True)
+        if not _len:
+            _len = len(_l_shapes)
+        
+        if len(_l_shapes) != _len:
+            log.warning("|{0}| >>  {1} | len{2} doesn't match base: {3}".format(_str_func, o,
+                                                                                len(_l_shapes,
+                                                                                    _len)))
+            continue
+        l_mainCurves.append(o)
+        l_shapes.append(_l_shapes)
+    
+    if len(l_shapes)<2:
+        raise ValueError,"Must have more than two valid shape lists"
+    
+    log.debug("|{0}| >> Making connectors".format(_str_func))
+    d_compPos = {}
+    for i,shps in enumerate(l_shapes):
+        log.debug("|{0}| >> Shapes {1} | {2}".format(_str_func,i,shps))
+        for ii,shp in enumerate(shps):
+            log.debug("|{0}| >> Shape {1} | {2}".format(_str_func,ii,shp))            
+            for iii,comp in enumerate(mc.ls("{0}.{1}[*]".format(shp,component),flatten=True,long=True)):
+                _key = "{0},{1}".format(ii,iii)
+                if not d_compPos.get(_key):
+                    d_compPos[_key] = []
+        
+                _l = d_compPos[_key]
+                _l.append(POS.get(comp))
+    pprint.pprint(d_compPos)
+    _cnt = 0
+    for k,points in d_compPos.iteritems():
+        l_use = []        
+        if mode == 'even':
+            for i,p in enumerate(points):
+                if MATH.is_even(i):
+                    l_use.append(p)
+        elif mode == 'odd':
+            l_use = []
+            for i,p in enumerate(points):
+                if not MATH.is_even(i):
+                    l_use.append(p)
+        else:
+            l_use = points
+        
+        crv_connect = create_fromList(posList=l_use)
+        l_mainCurves.append(crv_connect)
+        _cnt +=1
+    
+    for crv in l_mainCurves[1:]:
+        RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+
+
     
 def controlCurve_update(target = None):
     """
@@ -833,7 +896,7 @@ def create_controlCurve(target = None, shape= 'circle', color = 'yellow',
     _targets = cgmValid.objStringList(target,noneValid=True,calledFrom=_str_func)
     _sizeMode = cgmValid.kw_fromList(sizeMode,['guess','fixed','cast'],True,calledFrom=_str_func)
     
-    log.info("|{0}| >> target:{1} | shape:{2} | color:{3} | sizeMode:{4} | size:{5} | direction:{6}".format(_str_func,_targets,shape,color,sizeMode,size,direction))
+    log.debug("|{0}| >> target:{1} | shape:{2} | color:{3} | sizeMode:{4} | size:{5} | direction:{6}".format(_str_func,_targets,shape,color,sizeMode,size,direction))
     
     _res = []
     if not _targets:
@@ -1402,7 +1465,7 @@ def attachObjToCurve(obj = None, crv = None):
     returns param
     """
     _str_funcName = 'attachObjToCurve'
-    log.info(">>> %s >> "%_str_funcName + "="*75)
+    log.debug(">>> %s >> "%_str_funcName + "="*75)
     try:
 	obj = cgmValid.objString(obj,isTransform=True)
 	crv = cgmValid.objString(crv,mayaType='nurbsCurve')	
@@ -1449,7 +1512,7 @@ def getUParamOnCurve(obj = None, crv = None):
     returns param
     """
     _str_funcName = 'getUParamOnCurve'
-    log.info(">>> %s >> "%_str_funcName + "="*75)
+    log.debug(">>> %s >> "%_str_funcName + "="*75)
     mi_obj = cgmValid.objString(obj)
     mi_crv = cgmValid.objString(crv,mayaType='nurbsCurve')
     mi_shape = cgmMeta.validateObjArg(mc.listRelatives(mi_crv,shapes = True,f=True)[0])
@@ -1479,7 +1542,7 @@ def getUParamOnCurveFromObj(obj = None, crv = None):
     returns param
     """
     _str_funcName = 'getUParamOnCurve'
-    log.info(">>> %s >> "%_str_funcName + "="*75)
+    log.debug(">>> %s >> "%_str_funcName + "="*75)
     mi_obj = cgmValid.objString(obj)
     mi_crv = cgmValid.objString(crv,mayaType='nurbsCurve')
     mi_shape = cgmMeta.validateObjArg(mc.listRelatives(mi_crv,shapes = True,f=True)[0])
@@ -1487,7 +1550,7 @@ def getUParamOnCurveFromObj(obj = None, crv = None):
     _node = mc.createNode ('nearestPointOnCurve', n = 'TESTING')
     _loc = mc.spaceLocator()[0]
     SNAP.go(_loc,obj)
-    #log.info(_loc)
+    #log.debug(_loc)
     p = []
     distances = []
     
@@ -1516,7 +1579,7 @@ def isEP(*args, **kws):
                                          {'kw':'reportTimes',"default":False}]	    
             self.__dataBind__(*args, **kws)
             #=================================================================
-            #log.info(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
+            #log.debug(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
 
         def __func__(self):
             """
@@ -1529,35 +1592,16 @@ def isEP(*args, **kws):
             else: return False	     
     return fncWrap(*args, **kws).go()
 
-def getMidPoint(*args, **kws):
-    """
-    Function to see if a curve is an ep curve
-    @kws
-    baseCurve -- curve on check
-    """
-    class fncWrap(cgmGEN.cgmFuncCls):
-        def __init__(self,*args, **kws):
-            """
-            """	
-            super(fncWrap, self).__init__(curve = None)
-            self._str_funcName = 'getMidPoint'	
-            self._l_ARGS_KWS_DEFAULTS = [{'kw':'curve',"default":None}]	    
-            self.__dataBind__(*args, **kws)
-            #=================================================================
-            #log.info(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
-
-        def __func__(self):
-            """
-            """
-            self.mi_crv = cgmMeta.validateObjArg(self.d_kws['curve'],mayaType='nurbsCurve',noneValid=False)
-            self._str_funcCombined = self._str_funcCombined + "('%s')"%self.mi_crv.p_nameShort
-
-            try:self.str_bufferU = mc.ls("{0}{1}".format(self.mi_crv.mNode,".u[*]"))[0]
-            except Exception,error:raise Exception,"ls fail | error: {0}".format(error)
-            self.f_maxU = float(self.str_bufferU.split(':')[-1].split(']')[0])	
-
-            return mc.pointPosition("%s.u[%f]"%(self.mi_crv.mNode,self.f_maxU/2), w=True)
-    return fncWrap(*args, **kws).go()
+def getMidPoint(curve=None):
+    mCrv = cgmValid.objString(curve,mayaType='nurbsCurve')
+    mShape = cgmMeta.validateObjArg(mc.listRelatives(mCrv,shapes = True,f=True)[0])
+    
+    _min = mShape.minValue
+    _max = mShape.maxValue
+    _mid = (_max - _min)/2.0
+    
+    return mc.pointPosition("{0}.u[{1}]".format(mShape.mNode,_mid), w=True)
+    
 
 def getPercentPointOnCurve(*args, **kws):
     """
@@ -1576,7 +1620,7 @@ def getPercentPointOnCurve(*args, **kws):
                                          {'kw':'factor',"default":.1}]	    
             self.__dataBind__(*args, **kws)
             #=================================================================
-            #log.info(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
+            #log.debug(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
 
         def __func__(self):
             """
@@ -1612,7 +1656,7 @@ def convertCurve(*args, **kws):
                                          {'kw':"keepOriginal","default":True}]	    
             self.__dataBind__(*args, **kws)
             #=================================================================
-            #log.info(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
+            #log.debug(">"*3 + " Log Level: %s "%log.getEffectiveLevel())	
 
         def __func__(self):
             """
@@ -1693,23 +1737,23 @@ def mirrorCurve(*args, **kws):
             if not mi_target:#if no target, mirror self
                 if not self.d_base['b_oneSided']:
                     if self.d_base['b_even']:
-                        log.info("%s Even mirror"%self._str_reportStart)			
+                        log.debug("%s Even mirror"%self._str_reportStart)			
                         l_cvPos = self.d_base['l_cvPos']
                         l_cvs = self.d_base['l_cvs']			
                         int_split = int(len(l_cvPos)/2)
-                        log.info(int_split)
+                        log.debug(int_split)
                         l_splitDriven = l_cvs[int_split:]
                         l_splitDriver = l_cvs[:int_split]
                         l_splitDriverPos = l_cvPos[:int_split]			
                         l_splitDriverPos.reverse()
-                        log.info("%s l_splitDriven: %s"%(self._str_reportStart,l_splitDriven))
-                        log.info("%s l_splitDriver: %s"%(self._str_reportStart,l_splitDriver))			
+                        log.debug("%s l_splitDriven: %s"%(self._str_reportStart,l_splitDriven))
+                        log.debug("%s l_splitDriver: %s"%(self._str_reportStart,l_splitDriver))			
                         for i,cv in enumerate(l_splitDriven):
                             pos = l_splitDriverPos[i]
                             mc.move(-pos[0],pos[1],pos[2], cv, ws=True)
                         return True
                     else:
-                        log.info("%s nonEven mirror"%self._str_reportStart)			
+                        log.debug("%s nonEven mirror"%self._str_reportStart)			
                         l_cvPos = self.d_base['l_cvPos']
                         l_cvs = self.d_base['l_cvs']			
                         int_split = int(len(l_cvPos)/2)
@@ -1719,14 +1763,14 @@ def mirrorCurve(*args, **kws):
                         l_splitDriver = l_cvs[:int_split]
                         l_splitDriverPos = l_cvPos[:int_split]			
                         l_splitDriverPos.reverse()
-                        log.info("%s l_splitDriven: %s"%(self._str_reportStart,l_splitDriven))
-                        log.info("%s l_splitDriver: %s"%(self._str_reportStart,l_splitDriver))			
+                        log.debug("%s l_splitDriven: %s"%(self._str_reportStart,l_splitDriven))
+                        log.debug("%s l_splitDriver: %s"%(self._str_reportStart,l_splitDriver))			
                         for i,cv in enumerate(l_splitDriven):
                             pos = l_splitDriverPos[i]
                             mc.move(-pos[0],pos[1],pos[2], cv, ws=True)
                         return True		
                 else:#it's one sided
-                    log.info("%s Build other side. New crv"%self._str_reportStart)
+                    log.debug("%s Build other side. New crv"%self._str_reportStart)
                     l_epPos = self.d_base['l_epPos']
                     l_otherSide = copy.copy(l_epPos)
                     l_otherSide.reverse()
@@ -1850,10 +1894,6 @@ def mirrorCurve(*args, **kws):
 
     return fncWrap(*args, **kws).go()
 
-import pprint
-import cgm.core.lib.math_utils as MATH
-reload(MATH)
-import cgm.core.lib.list_utils as LISTS
 
 def mirror_worldSpace(base=None, target = None, mirrorAcross = 'x'):
     _str_func = 'mirror_worldSpace'    
@@ -1885,6 +1925,8 @@ def mirror_worldSpace(base=None, target = None, mirrorAcross = 'x'):
             _new =  MATH.list_mult(_pos,_mult)
             POS.set(_l_ep_target[ii], _new)
             log.debug("|{0}| >> shape: {7} || {1} | {2} > {3} | {4} >> {5} | ?actual: {6}".format(_str_func,ii,ep,_l_ep_target[ii],_pos,_new,  POS.get(_l_ep_target[ii]), s))                                                            
+    
+    mc.reverseCurve(target,constructionHistory=False,replaceOriginal=True)
         
     #pprint.pprint(vars())
     

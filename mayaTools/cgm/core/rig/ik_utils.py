@@ -36,6 +36,7 @@ from cgm.core.rigger.lib import rig_Utils
 from cgm.core.classes import NodeFactory as NodeF
 import cgm.core.rig.joint_utils as JOINTS
 import cgm.core.lib.attribute_utils as ATTR
+import cgm.core.lib.transform_utils as TRANS
 import cgm.core.lib.distance_utils as DIST
 import cgm.core.rig.constraint_utils as RIGCONSTRAINTS
 import cgm.core.rig.create_utils as RIGCREATE
@@ -48,7 +49,7 @@ import cgm.core.lib.math_utils as MATH
 import cgm.core.rig.skin_utils as RIGSKIN
 import cgm.core.lib.position_utils as POS
 
-for m in CURVES,RIGCREATE,RIGGEN,LISTS,RIGCONSTRAINTS,MATH,NODES:
+for m in CURVES,RIGCREATE,RIGGEN,LISTS,RIGCONSTRAINTS,MATH,NODES,NodeF:
     reload(m)
 
 def spline(jointList = None,
@@ -303,11 +304,11 @@ def spline(jointList = None,
                 #Let's build our args
                 l_argBuild = []
                 #distance by master
-                l_argBuild.append("{0} = {1} / {2}".format(mPlug_attrNormalBaseDist.p_combinedShortName,
+                l_argBuild.append("{0} = {1} / {2}".format(mPlug_attrNormalBaseDist.p_combinedName,
                                                            '{0}.baseDist_{1}'.format(mIKHandle.mNode,i),
                                                            "{0}.masterScale".format(mSegmentCurve.mNode)))
-                l_argBuild.append("{0} = {1} / {2}".format(mPlug_attrNormalDist.p_combinedShortName,
-                                                           mPlug_attrDist.p_combinedShortName,
+                l_argBuild.append("{0} = {1} / {2}".format(mPlug_attrNormalDist.p_combinedName,
+                                                           mPlug_attrDist.p_combinedName,
                                                            "{0}.masterScale".format(mSegmentCurve.mNode)))			
                 for arg in l_argBuild:
                     log.debug("|{0}| >> Building arg: {1}".format(_str_func,arg))
@@ -486,14 +487,14 @@ def addSplineTwist(ikHandle = None, midHandle = None, advancedTwistSetup = False
        
         #First Handle ----------------------------------------------------------------------------------------
         
-        arg1 = "{0} = {1} - {2}".format(mPlug_midDiff.p_combinedShortName,
-                                        mPlug_end.p_combinedShortName,
-                                        mPlug_start.p_combinedShortName)    
-        arg2 = "{0} = {1} / 2".format(mPlug_midDiv.p_combinedShortName,
-                                      mPlug_midDiff.p_combinedShortName)
-        arg3 = "{0} = {1} + {2}".format(mPlug_midResult.p_combinedShortName,
-                                        mPlug_midDiv.p_combinedShortName,
-                                        mPlug_mid.p_combinedShortName)
+        arg1 = "{0} = {1} - {2}".format(mPlug_midDiff.p_combinedName,
+                                        mPlug_end.p_combinedName,
+                                        mPlug_start.p_combinedName)    
+        arg2 = "{0} = {1} / 2".format(mPlug_midDiv.p_combinedName,
+                                      mPlug_midDiff.p_combinedName)
+        arg3 = "{0} = {1} + {2}".format(mPlug_midResult.p_combinedName,
+                                        mPlug_midDiv.p_combinedName,
+                                        mPlug_mid.p_combinedName)
         
         for a in arg1,arg2,arg3:
             NodeF.argsToNodes(a).doBuild()
@@ -513,37 +514,37 @@ def addSplineTwist(ikHandle = None, midHandle = None, advancedTwistSetup = False
         mPlug_midSum.doConnectOut("{0}.roll".format(mMidHandle.p_nameShort))
         mPlug_midTwist.doConnectOut("{0}.twist".format(mMidHandle.p_nameShort))
         
-        arg1 = "{0} = {1}".format(mPlug_midSum.p_combinedShortName,
+        arg1 = "{0} = {1}".format(mPlug_midSum.p_combinedName,
                                   ' + '.join(["{0}.r{1}".format(mJnt.p_nameShort,orientation[0]) for mJnt in ml_joints]))
         log.debug(arg1)
-        arg2 = "{0} = {1} - {2}".format(mPlug_midTwist.p_combinedShortName,
-                                        mPlug_end.p_combinedShortName,
-                                        mPlug_midSum.p_combinedShortName)
+        arg2 = "{0} = {1} - {2}".format(mPlug_midTwist.p_combinedName,
+                                        mPlug_end.p_combinedName,
+                                        mPlug_midSum.p_combinedName)
         for a in arg1,arg2:
             NodeF.argsToNodes(a).doBuild()
         
         """arg1 = "{0}.twist = if {1} > {2}: {3} else {4}".format(mMidHandle.p_nameShort,
                                                                mPlug_start.p_combinedName,
                                                                mPlug_end.p_combinedName,                                                               
-                                                               mPlug_endMidDiffResult.p_combinedShortName,
-                                                               mPlug_endMidDiffNegResult.p_combinedShortName)"""        
+                                                               mPlug_endMidDiffResult.p_combinedName,
+                                                               mPlug_endMidDiffNegResult.p_combinedName)"""        
         
         #Second roll...
         
         
         """
         arg1 = "{0}.twist = {1} - {2}".format(mMidHandle.p_nameShort,
-                                              mPlug_end.p_combinedShortName,
-                                              mPlug_midNegResult.p_combinedShortName)
+                                              mPlug_end.p_combinedName,
+                                              mPlug_midNegResult.p_combinedName)
         """
         
         
     else:
         mPlug_start.doConnectOut("%s.roll"%mIKHandle.mNode)
         #ikHandle1.twist = (ikHandle1.roll *-.77) + curve4.twistEnd # to implement
-        arg1 = "{0} = {1} - {2}".format(mPlug_twist.p_combinedShortName,
-                                        mPlug_end.p_combinedShortName,
-                                        mPlug_start.p_combinedShortName)
+        arg1 = "{0} = {1} - {2}".format(mPlug_twist.p_combinedName,
+                                        mPlug_end.p_combinedName,
+                                        mPlug_start.p_combinedName)
         NodeF.argsToNodes(arg1).doBuild()
         
         
@@ -558,7 +559,7 @@ def addSplineTwist(ikHandle = None, midHandle = None, advancedTwistSetup = False
 
         mPlug_existingTwistType = cgmMeta.cgmAttr(mi_ramp,'interpolation')
         mPlug_twistType = cgmMeta.cgmAttr(mi_crv,'twistType', attrType = 'enum', enum = ":".join(mPlug_existingTwistType.p_enum))
-        mPlug_twistType.doConnectOut(mPlug_existingTwistType.p_combinedShortName)	
+        mPlug_twistType.doConnectOut(mPlug_existingTwistType.p_combinedName)	
     else:
         mPlug_existingTwistType = cgmMeta.cgmAttr(mIKHandle,'twistType')
         mPlug_twistType = cgmMeta.cgmAttr(mi_crv,'twistType', attrType = 'enum', enum = ":".join(mPlug_existingTwistType.p_enum))
@@ -609,7 +610,7 @@ def addSplineTwistOLD(ikHandle, midHandle = None, advancedTwistSetup = False):
     mPlug_start.doConnectOut("%s.roll"%mIKHandle.mNode)
     d_return['mi_plug_twist']=mPlug_twist
     #ikHandle1.twist = (ikHandle1.roll *-.77) + curve4.twistEnd # to implement
-    arg1 = "%s = %s - %s"%(mPlug_twist.p_combinedShortName,mPlug_end.p_combinedShortName,mPlug_start.p_combinedShortName)
+    arg1 = "%s = %s - %s"%(mPlug_twist.p_combinedName,mPlug_end.p_combinedName,mPlug_start.p_combinedName)
     log.debug("arg1: '%s'"%arg1)    
     log.debug( NodeF.argsToNodes(arg1).doBuild() )       
 
@@ -625,12 +626,12 @@ def addSplineTwistOLD(ikHandle, midHandle = None, advancedTwistSetup = False):
 
         mPlug_existingTwistType = cgmMeta.cgmAttr(mi_ramp,'interpolation')
         mPlug_twistType = cgmMeta.cgmAttr(mi_crv,'twistType', attrType = 'enum', enum = ":".join(mPlug_existingTwistType.p_enum))
-        mPlug_twistType.doConnectOut(mPlug_existingTwistType.p_combinedShortName)	
+        mPlug_twistType.doConnectOut(mPlug_existingTwistType.p_combinedName)	
     else:
         mPlug_existingTwistType = cgmMeta.cgmAttr(mIKHandle,'twistType')
         mPlug_twistType = cgmMeta.cgmAttr(mi_crv,'twistType', attrType = 'enum', enum = ":".join(mPlug_existingTwistType.p_enum))
         mPlug_twistType.twistType = 'linear'	
-        mPlug_twistType.doConnectOut(mPlug_existingTwistType.p_combinedShortName)	
+        mPlug_twistType.doConnectOut(mPlug_existingTwistType.p_combinedName)	
     return d_return
 
 
@@ -878,17 +879,21 @@ def ribbon(jointList = None,
            driverSetup = None,#...aim.stable
            msgDriver = None,#...msgLink on joint to a driver group for constaint purposes
            settingsControl = None,
+           additiveScaleEnds = False, 
            extraSquashControl = False,#...setup extra attributes
            specialMode = None,
            masterScalePlug = None,
            squashFactorMode = 'midPeak',
            squashFactorMin = 0.0,
            squashFactorMax = 1.0,
+           paramaterization='blend',
            #advancedTwistSetup = False,
            #extendTwistToEnd = False,
            #reorient = False,
+           skipAim = True,
            influences = None,
            extraKeyable = True,
+           ribbonJoints = None,
            attachEndsToInfluences = False,
            moduleInstance = None,
            parentGutsTo = None):
@@ -910,6 +915,11 @@ def ribbon(jointList = None,
         secondaryAxis(maya axis arg(y+) | Only necessary when no module provide for orientating
         baseName(string - None) | baseName string
         connectBy(str)
+        
+        paramaterization(string)
+            fixed - Hard value uv
+            floating - Floating uv value from reparamterized curve
+            blend - Blend of the two
         
         squashStretchMain(str)
             arcLength
@@ -948,9 +958,10 @@ def ribbon(jointList = None,
             'create' - make a measure curve. It'll be connected to the main surface on a message attr called segScaleCurve
             attribute arg - use this plug
             
-            
+        additiveScaleEnds(bool - False) | Whether to setup end scaling to it works more as expected for ends
         advancedTwistSetup(bool - False) | Whether to do the cgm advnaced twist setup
         addMidTwist(bool - True) | Whether to setup a mid twist on the segment
+        skipAim(bool - True) | Whether to setup the aim scale or not
         
         influences(joints - None) | List or metalist of joints to skin our objects to
         attachEndsToInfluences(bool) - Connect the first and last joint to the influence 0,-1. Still use scale setup.
@@ -974,8 +985,15 @@ def ribbon(jointList = None,
     #try:
     #>>> Verify =============================================================================================
     ml_joints = cgmMeta.validateObjListArg(jointList,mType = 'cgmObject', mayaType=['joint'], noneValid = False)
-    l_joints = [mJnt.p_nameShort for mJnt in ml_joints]
+    l_joints = [mJnt.mNode for mJnt in ml_joints]
     int_lenJoints = len(ml_joints)#because it's called repeatedly
+    
+    if ribbonJoints is None:
+        ml_ribbonJoints = ml_joints
+        l_ribbonJoints = l_joints
+    else:
+        ml_ribbonJoints = cgmMeta.validateObjListArg(ribbonJoints,mType = 'cgmObject', mayaType=['joint'], noneValid = False)
+        l_ribbonJoints = [mJnt.mNode for mJnt in ml_ribbonJoints]
     
     mi_useSurface = cgmMeta.validateObjArg(useSurface,mayaType=['nurbsSurface'],noneValid = True)
     mi_mayaOrientation = VALID.simpleOrientation(orientation)
@@ -1011,9 +1029,9 @@ def ribbon(jointList = None,
     #b_advancedTwistSetup = VALID.boolArg(advancedTwistSetup)
     #b_extendTwistToEnd= VALID.boolArg(extendTwistToEnd)
 
-    if int_lenJoints<3:
-        pprint.pprint(vars())
-        raise ValueError,"needs at least three joints"
+    #if int_lenJoints<3:
+        #pprint.pprint(vars())
+        #raise ValueError,"needs at least three joints"
     
     if parentGutsTo is None:
         mGroup = cgmMeta.cgmObject(name = 'newgroup')
@@ -1026,6 +1044,10 @@ def ribbon(jointList = None,
         
     if mModule:
         mGroup.parent = mModule.rigNull
+
+    if additiveScaleEnds and not extendEnds:
+        extendEnds=True
+
 
     #Good way to verify an instance list? #validate orientation             
     #> axis -------------------------------------------------------------
@@ -1080,12 +1102,13 @@ def ribbon(jointList = None,
     
     mControlSurface2 = False
     ml_surfaces = []
-    #>>> Ribbon Surface ===========================================================================================        
+    
+    #>>> Ribbon Surface ================================================================================        
     if mi_useSurface:
         raise NotImplementedError,'Not done with passed surface'
     else:
         log.debug("|{0}| >> Creating surface...".format(_str_func))
-        l_surfaceReturn = ribbon_createSurface(jointList,loftAxis,sectionSpans,extendEnds)
+        l_surfaceReturn = ribbon_createSurface(l_ribbonJoints,loftAxis,sectionSpans,extendEnds)
     
         mControlSurface = cgmMeta.validateObjArg( l_surfaceReturn[0],'cgmObject',setClass = True )
         mControlSurface.addAttr('cgmName',str(baseName),attrType='string',lock=True)    
@@ -1096,7 +1119,7 @@ def ribbon(jointList = None,
         
         if loftAxis2:
             log.debug("|{0}| >> Creating surface...".format(_str_func))
-            l_surfaceReturn2 = ribbon_createSurface(jointList,loftAxis2,sectionSpans,extendEnds)
+            l_surfaceReturn2 = ribbon_createSurface(l_ribbonJoints,loftAxis2,sectionSpans,extendEnds)
         
             mControlSurface2 = cgmMeta.validateObjArg( l_surfaceReturn[0],'cgmObject',setClass = True )
             mControlSurface2.addAttr('cgmName',str(baseName),attrType='string',lock=True)
@@ -1110,13 +1133,15 @@ def ribbon(jointList = None,
     _surf_shape = mControlSurface.getShapes()[0]
     minU = ATTR.get(_surf_shape,'minValueU')
     maxU = ATTR.get(_surf_shape,'maxValueU')
-
+    minV = ATTR.get(_surf_shape,'minValueV')
+    maxV = ATTR.get(_surf_shape,'maxValueV')
     
     ml_toConnect = []
     ml_toConnect.extend(ml_surfaces)
     
     mArcLenCurve = None
     mArcLenDag = None
+    
     if b_squashStretch and squashStretchMain == 'arcLength':
         log.debug("|{0}| >> Creating arc curve setup...".format(_str_func))
         
@@ -1148,11 +1173,22 @@ def ribbon(jointList = None,
         mPlug_inverseScale = cgmMeta.cgmAttr(mArcLen.mNode,plug_inverse,'float')
         
         l_argBuild=[]
+        
         """
-        l_argBuild.append("{0} = {1} / {2}".format(mPlug_masterScale.p_combinedShortName,
+        if not masterScalePlug or masterScalePlug == 'create':
+            plug_master = '{0}_segMasterScale'.format(str_baseName)
+            mPlug_masterScale = cgmMeta.cgmAttr(mArcLen.mNode,plug_master,'float')
+            l_argBuild.append("{0} = {1} / {2}".format(mPlug_masterScale.p_combinedName,
+                                                       '{0}.arcLengthInV'.format(mArcLen.mNode),
+                                                       "{0}.baseDist".format(mArcLen.mNode)))
+            masterScalePlug = mPlug_masterScale"""
+            
+        
+        """
+        l_argBuild.append("{0} = {1} / {2}".format(mPlug_masterScale.p_combinedName,
                                                    '{0}.arcLength'.format(mInfoNode.mNode),
                                                    "{0}.baseDist".format(mCrv.mNode)))"""
-        l_argBuild.append("{0} = {2} / {1}".format(mPlug_inverseScale.p_combinedShortName,
+        l_argBuild.append("{0} = {2} / {1}".format(mPlug_inverseScale.p_combinedName,
                                                    '{0}.arcLengthInV'.format(mArcLen.mNode),
                                                    "{0}.baseDist".format(mArcLen.mNode)))        
         
@@ -1160,44 +1196,145 @@ def ribbon(jointList = None,
         for arg in l_argBuild:
             log.debug("|{0}| >> Building arg: {1}".format(_str_func,arg))
             NodeF.argsToNodes(arg).doBuild()
+            
+    #Settings ... ----------------------------------------------------------------------------------------
+    if settingsControl:
+        mSettings = cgmMeta.validateObjArg(settingsControl,'cgmObject')
+    else:
+        mSettings = mControlSurface
+    
+    
+    #Reparam ----------------------------------------------------------------------------------------
+    mCrv_reparam = False
+    str_paramaterization = str(paramaterization).lower()
+    if str_paramaterization in ['blend','floating']:
+        log.debug("|{0}| >> Reparameterization curve needed...".format(_str_func))
+        #crv = CORERIG.create_at(None,'curve',l_pos= [mJnt.p_position for mJnt in ml_joints])
+        _crv = mc.duplicateCurve("{0}.u[{1}]".format(_surf_shape,MATH.median(minU,maxU)),
+                                 ch = 1,
+                                 rn = 0,
+                                 local = 0)
         
-        
-        
-        """
-        crv = CORERIG.create_at(None,'curve',l_pos= [mJnt.p_position for mJnt in ml_joints])
-        mCrv = cgmMeta.validateObjArg(crv,'cgmObject',setClass=True)
-        mCrv.rename('{0}_measureCrv'.format( baseName))
-        
-        ml_toConnect.append(mCrv)
-        
-        mArcLenCurve = mCrv
-        
-        mControlSurface.connectChildNode(mCrv,plug_curve,'ribbon')
 
-        log.debug("|{0}| >> created: {1}".format(_str_func,mCrv)) 
-
-        infoNode = CURVES.create_infoNode(mCrv.mNode)
-
-        mInfoNode = cgmMeta.validateObjArg(infoNode,'cgmNode',setClass=True)
-        mCrv.addAttr('baseDist', mInfoNode.arcLength,attrType='float',lock=True)
-        mInfoNode.rename('{0}_{1}_measureCIN'.format( baseName,plug))
-
-        log.debug("|{0}| >> baseDist: {1}".format(_str_func,mCrv.baseDist)) 
-
-        #mPlug_masterScale = cgmMeta.cgmAttr(mCrv.mNode,plug,'float')
-        mPlug_inverseScale = cgmMeta.cgmAttr(mCrv.mNode,plug_inverse,'float')
+        mCrv_reparam = cgmMeta.validateObjArg(_crv[0],setClass=True)
+        mCrv_reparam.doStore("cgmName","{0}_reparam".format(str_baseName))
+        mCrv_reparam.doName()        
+        cgmMeta.cgmNode(_crv[1]).doName()
         
-        l_argBuild=[]
+        mc.rebuildCurve(mCrv_reparam.mNode, d=3, keepControlPoints=False,ch=1,n="reparamRebuild")
+        #cubic keepC
+        md_floatTrackGroups = {}
+        md_floatTrackNodes = {}
+        md_floatParameters = {}
+        d_vParameters = {}
+        
+        mCrv_reparam.p_parent = mGroup
+        
+        l_argBuild = []
+        mPlug_vSize = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                      "{0}_vSize".format(str_baseName),
+                                      attrType = 'float',
+                                      hidden = False,
+                                      lock=False)
+        
+        l_argBuild.append("{0} = {1} - {2}".format(mPlug_vSize.p_combinedName,
+                                                   maxV,minV))        
+                
+        if str_paramaterization == 'blend':
+            if not mSettings.hasAttr('blendParam'):
+                mPlug_paramBlend = cgmMeta.cgmAttr(mSettings.mNode,
+                                                   "blendParam".format(str_baseName),
+                                                   attrType = 'float',
+                                                   minValue=0,
+                                                   maxValue=1.0,
+                                                   keyable=True,
+                                                   value= 1.0,
+                                                   defaultValue=1.0,
+                                                   hidden = False,
+                                                   lock=False)
+            else:
+                mPlug_paramBlend = cgmMeta.cgmAttr(mSettings.mNode,"blendParam".format(str_baseName))
+            md_paramBlenders = {}
+        
+        #Set up per joint...
+        for i,mObj in enumerate(ml_joints):
+            mPlug_normalized = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                               "{0}_normalizedV_{1}".format(str_baseName,i),
+                                               attrType = 'float',
+                                               hidden = False,
+                                               lock=False)
+            mPlug_sum = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                        "{0}_sumV_{1}".format(str_baseName,i),
+                                        attrType = 'float',
+                                        hidden = False,
+                                        lock=False)            
+            mLoc = mObj.doLoc()
+            
+            _res = RIGCONSTRAINTS.attach_toShape(mObj,mCrv_reparam.mNode,None)
+            md_floatTrackGroups[i]=_res[0]
+            #res_closest = DIST.create_closest_point_node(mLoc.mNode, mCrv_reparam.mNode,True)
+            log.debug("|{0}| >> Closest info {1} : {2}".format(_str_func,i,_res))
+            mLoc.p_parent = mGroup
 
-        l_argBuild.append("{0} = {2} / {1}".format(mPlug_inverseScale.p_combinedShortName,
-                                                   '{0}.arcLength'.format(mInfoNode.mNode),
-                                                   "{0}.baseDist".format(mCrv.mNode)))        
-        
-        
+            srfNode = mc.createNode('closestPointOnSurface')
+            mc.connectAttr("%s.worldSpace[0]" % _surf_shape, "%s.inputSurface" % srfNode)
+            mc.connectAttr("%s.translate" % _res[0], "%s.inPosition" % srfNode)
+            mc.connectAttr("%s.position" % srfNode, "%s.translate" % mLoc.mNode, f=True) 
+            md_floatParameters[i] = mPlug_normalized            
+            mClosestPoint =  cgmMeta.validateObjArg(srfNode,setClass=True)
+            mClosestPoint.doStore('cgmName',mObj.mNode)
+            mClosestPoint.doName()
+            md_floatTrackNodes[i] = mClosestPoint
+            srfNode = mClosestPoint.mNode
+            
+            TRANS.parent_set(_res[0],mGroup.mNode)
+            
+            log.debug("|{0}| >> paramU {1} : {2}.parameterU | {3}".format(_str_func,i,srfNode,
+                                                                          ATTR.get(srfNode,'parameterU')))
+            log.debug("|{0}| >> paramV {1} : {2}.parameterV | {3}".format(_str_func,i,srfNode,
+                                                                          ATTR.get(srfNode,'parameterV')))
+            
+
+            
+            l_argBuild.append("{0} = {1} + {2}.parameterV".format(mPlug_sum.p_combinedName,
+                                                                  minV,
+                                                                  srfNode))
+            
+            l_argBuild.append("{0} = {1} / {2}".format(mPlug_normalized.p_combinedName,
+                                                       mPlug_sum.p_combinedName,
+                                                       mPlug_vSize.p_combinedName))
+            
+            
+            if str_paramaterization == 'blend':
+                mPlug_baseV = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                               "{0}_baseV_{1}".format(str_baseName,i),
+                                               attrType = 'float',
+                                               hidden = False,
+                                               lock=False)
+                mPlug_blendV = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                               "{0}_blendV_{1}".format(str_baseName,i),
+                                               attrType = 'float',
+                                               hidden = False,
+                                               lock=False)
+                
+                mBlendNode = cgmMeta.cgmNode(nodeType = 'blendTwoAttr')
+                mBlendNode.doStore('cgmName',"{0}_blendV".format(mObj.mNode))
+                mBlendNode.doName()
+                
+                md_paramBlenders[i] = mBlendNode
+                ATTR.set(md_paramBlenders[i].mNode,"input[0]",1)
+                mPlug_normalized.doConnectOut("%s.input[1]"%mBlendNode.mNode)
+                mPlug_paramBlend.doConnectOut("%s.attributesBlender"%mBlendNode.mNode)
+                d_vParameters[i] = "{0}.output".format(mBlendNode.mNode)
+                
+            else:
+                d_vParameters[i] = mPlug_normalized.p_combinedName
+
         for arg in l_argBuild:
             log.debug("|{0}| >> Building arg: {1}".format(_str_func,arg))
-            NodeF.argsToNodes(arg).doBuild()"""
-    
+            NodeF.argsToNodes(arg).doBuild()
+            
+            
     if b_squashStretch and masterScalePlug is not None:
         log.debug("|{0}| >> Checking masterScalePlug: {1}".format(_str_func, masterScalePlug))        
         if masterScalePlug == 'create':
@@ -1224,7 +1361,7 @@ def ribbon(jointList = None,
             mPlug_masterScale = cgmMeta.cgmAttr(mControlSurface.mNode,plug,'float')
     
             l_argBuild=[]
-            l_argBuild.append("{0} = {1} / {2}".format(mPlug_masterScale.p_combinedShortName,
+            l_argBuild.append("{0} = {1} / {2}".format(mPlug_masterScale.p_combinedName,
                                                        '{0}.arcLength'.format(mInfoNode.mNode),
                                                        "{0}.baseDist".format(mInfoNode.mNode)))
             for arg in l_argBuild:
@@ -1243,10 +1380,6 @@ def ribbon(jointList = None,
         if not mPlug_masterScale:
             raise ValueError,"Should have a masterScale plug by now"
     
-    if settingsControl:
-        mSettings = cgmMeta.validateObjArg(settingsControl,'cgmObject')
-    else:
-        mSettings = mControlSurface
         
     b_attachToInfluences = False
     if attachEndsToInfluences:
@@ -1256,7 +1389,7 @@ def ribbon(jointList = None,
         log.debug("|{0}| >> b_attachToInfluences: {1}".format(_str_func,b_attachToInfluences))
         
     
-    #>>> Follicles ===========================================================================================        
+    #>>> Follicles ======================================================================================        
     log.debug("|{0}| >> Follicles...".format(_str_func)+cgmGEN._str_subLine)
     
     ml_follicles = []
@@ -1294,6 +1427,14 @@ def ribbon(jointList = None,
         follicle,shape = RIGCONSTRAINTS.attach_toShape(mDriven.mNode, mControlSurface.mNode, None)
         mFollicle = cgmMeta.asMeta(follicle)
         mFollShape = cgmMeta.asMeta(shape)
+        
+        if mCrv_reparam:
+            if str_paramaterization == 'blend':
+                ATTR.set(md_paramBlenders[i].mNode,"input[0]",mFollShape.parameterV)
+            ATTR.connect(d_vParameters[i],
+                         '{0}.parameterV'.format(mFollShape.mNode))
+            
+
         
         ml_follicleShapes.append(mFollShape)
         ml_follicles.append(mFollicle)
@@ -1342,8 +1483,11 @@ def ribbon(jointList = None,
         else:
             mc.parentConstraint([mDriver.mNode], mDriven.mNode, maintainOffset=True)
         
-    if extendEnds:
-        maxV = ATTR.get(mControlSurface.getShapes()[0],'maxValueV')
+    if extendEnds or additiveScaleEnds:
+        #End follicle...
+        _surf_shape = mControlSurface.getShapes()[0]
+        log.debug("|{0}| >> maxV follicle...".format(_str_func)+cgmGEN._str_subLine)                    
+        maxV = ATTR.get(_surf_shape,'maxValueV')
         
         l_FollicleInfo = NODES.createFollicleOnMesh( mControlSurface.mNode )
                    
@@ -1352,15 +1496,44 @@ def ribbon(jointList = None,
         
         mFollicle.parent = mGroup.mNode
         
-
         #> Name...
-        mFollicle.rename('{0}_extended'.format(ml_joints[-1].p_nameBase))
+        mFollicle.rename('{0}_maxV'.format(ml_joints[-1].p_nameBase))
     
         mFollicleShape.parameterU = ml_follicleShapes[-1].parameterU
         mFollicleShape.parameterV = maxV
         
         ml_follicles.append(mFollicle)
         ml_follicleShapes.append(mFollicleShape)
+        
+        mFollicleMaxV = mFollicle
+        mFollicleMaxVShape = mFollicleShape
+        
+        if additiveScaleEnds:
+            log.debug("|{0}| >> minV Follicle...".format(_str_func)+cgmGEN._str_subLine)                    
+            
+            #Start follicle
+            minV = ATTR.get(_surf_shape,'minValueV')
+            
+            l_FollicleInfo = NODES.createFollicleOnMesh( mControlSurface.mNode )
+            mFollicle = cgmMeta.asMeta(l_FollicleInfo[1],'cgmObject',setClass=True)
+            mFollicleShape = cgmMeta.asMeta(l_FollicleInfo[0],'cgmNode')
+            
+            mFollicle.parent = mGroup.mNode
+            
+            #> Name...
+            mFollicle.rename('{0}_minV'.format(ml_joints[0].p_nameBase))
+        
+            mFollicleShape.parameterU = ml_follicleShapes[0].parameterU
+            mFollicleShape.parameterV = minV
+            
+            ml_follicles.append(mFollicle)
+            ml_follicleShapes.append(mFollicleShape)
+            
+            mFollicleMinV = mFollicle
+            mFollicleMinVShape = mFollicleShape            
+        
+        
+        
         
     
     if ml_aimDrivers:
@@ -1394,7 +1567,7 @@ def ribbon(jointList = None,
                 mStableFollicle.parent = mGroup.mNode
                 
                 ml_folliclesStable.append(mStableFollicle)
-                ml_folliclesStableShapes.append(ml_folliclesStableShapes)
+                ml_folliclesStableShapes.append(mStableFollicleShape)
                 
                 #> Name...
                 #mStableFollicleTrans.doStore('cgmName',mObj.mNode)
@@ -1403,10 +1576,12 @@ def ribbon(jointList = None,
                 mStableFollicle.rename('{0}_surfaceStable'.format(ml_joints[i].p_nameBase))
             
                 mStableFollicleShape.parameterU = minU
-                mStableFollicleShape.parameterV = ml_follicleShapes[i].parameterV
+                #mStableFollicleShape.parameterV = ml_follicleShapes[i].parameterV
+                ATTR.connect('{0}.parameterV'.format(ml_follicleShapes[i].mNode),
+                             '{0}.parameterV'.format(mStableFollicleShape.mNode))
                 
                 if driverSetup == 'stable':
-                    if mDriver in [ml_aimDrivers[0],ml_aimDrivers[-1]]:
+                    if mDriver in [ml_aimDrivers[-1]]:
                         #...now aim it
                         mc.aimConstraint(mStableFollicle.mNode, mDriver.mNode, maintainOffset = True, #skip = 'z',
                                          aimVector = v_aim, upVector = v_up, worldUpObject = ml_upTargets[i].mNode,
@@ -1416,11 +1591,13 @@ def ribbon(jointList = None,
                         mc.aimConstraint(ml_follicles[i+1].mNode, ml_aimDrivers[i].mNode, maintainOffset = True, #skip = 'z',
                                          aimVector = v_aim, upVector = v_up, worldUpObject = ml_upTargets[i].mNode,
                                          worldUpType = 'object', worldUpVector = v_up)
-                else: #stableBlend....
+                elif driverSetup == 'stableBlend': #stableBlend....
                     if mDriver in [ml_aimDrivers[0],ml_aimDrivers[-1]]:
                         #...now aim it
                         mc.aimConstraint(mStableFollicle.mNode, mDriver.mNode, maintainOffset = True, #skip = 'z',
-                                         aimVector = v_aim, upVector = v_up, worldUpObject = ml_upTargets[i].mNode,
+                                         aimVector = v_aim,
+                                         upVector = v_up,
+                                         worldUpObject = ml_upTargets[i].mNode,
                                          worldUpType = 'object', worldUpVector = v_up)
                     else:
                         mAimForward = mDriver.doCreateAt()
@@ -1446,7 +1623,9 @@ def ribbon(jointList = None,
                         mc.orientConstraint([mAimForward.mNode,mAimBack.mNode], ml_aimDrivers[i].mNode, maintainOffset=True)
                         #mc.aimConstraint(ml_follicles[i+1].mNode, ml_aimDrivers[i].mNode, maintainOffset = True, #skip = 'z',
                         #                 aimVector = v_aim, upVector = v_up, worldUpObject = ml_upTargets[i].mNode,
-                        #                 worldUpType = 'object', worldUpVector = v_up)                                                            
+                        #                 worldUpType = 'object', worldUpVector = v_up)
+                else:
+                    pass
 
                     
                 
@@ -1492,6 +1671,7 @@ def ribbon(jointList = None,
                                              attrType = 'float',
                                              hidden = False,                                                 
                                              initialValue=1.0,
+                                             defaultValue=1.0,
                                              keyable = extraKeyable,
                                              lock=False,
                                              minValue = 0)
@@ -1502,9 +1682,9 @@ def ribbon(jointList = None,
                                              attrType = 'float',
                                              hidden = False,)
                 
-            arg = "{0} = {1} * {2}".format(mPlug_inverseNormalized.p_combinedShortName,
-                                           mPlug_inverseScale.p_combinedShortName,
-                                           mPlug_masterScale.p_combinedShortName)
+            arg = "{0} = {1} * {2}".format(mPlug_inverseNormalized.p_combinedName,
+                                           mPlug_inverseScale.p_combinedName,
+                                           mPlug_masterScale.p_combinedName)
             NodeF.argsToNodes(arg).doBuild()
             
         
@@ -1554,8 +1734,9 @@ def ribbon(jointList = None,
                 mUpFollicle.rename('{0}_surfaceUp'.format(ml_joints[i].p_nameBase))
             
                 mUpFollicleShape.parameterU = minU
-                mUpFollicleShape.parameterV = ml_follicleShapes[i].parameterV
-                
+                #mUpFollicleShape.parameterV = ml_follicleShapes[i].parameterV
+                ATTR.connect('{0}.parameterV'.format(ml_follicleShapes[i].mNode),
+                             '{0}.parameterV'.format(mUpFollicleShape.mNode))
             
         def createDist(mJnt, typeModifier = None):
             mShape = cgmMeta.cgmNode( mc.createNode ('distanceDimShape') )        
@@ -1689,7 +1870,7 @@ def ribbon(jointList = None,
 
         
         
-        #>>>Hook up stretch/scale #========================================================================= 
+        #>>>Hook up stretch/scale #================================================================ 
         if squashStretchMain == 'arcLength':
             log.debug("|{0}| >> arcLength aim stretch setup ".format(_str_func)+cgmGEN._str_subLine)
             for i,mJnt in enumerate(ml_joints):#Nodes =======================================================
@@ -1730,21 +1911,21 @@ def ribbon(jointList = None,
                     #>> x + (y - x) * blend --------------------------------------------------------
                     mPlug_baseRes = mPlug_inverseNormalized
                     """
-                    l_argBuild.append("{0} = {1} / {2}".format(mPlug_baseRes.p_combinedShortName,
-                                                               mPlug_aimBaseNorm.p_combinedShortName,
+                    l_argBuild.append("{0} = {1} / {2}".format(mPlug_baseRes.p_combinedName,
+                                                               mPlug_aimBaseNorm.p_combinedName,
                                                                "{0}.distance".format(mActive_aim.mNode)))"""
-                    l_argBuild.append("{0} = 1 + {1}".format(mPlug_aimResult.p_combinedShortName,
-                                                               mPlug_jointMult.p_combinedShortName))
-                    l_argBuild.append("{0} = {1} - 1".format(mPlug_jointDiff.p_combinedShortName,
-                                                             mPlug_baseRes.p_combinedShortName))
-                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointMult.p_combinedShortName,
-                                                               mPlug_jointDiff.p_combinedShortName,
-                                                               mPlug_jointRes.p_combinedShortName))
+                    l_argBuild.append("{0} = 1 + {1}".format(mPlug_aimResult.p_combinedName,
+                                                               mPlug_jointMult.p_combinedName))
+                    l_argBuild.append("{0} = {1} - 1".format(mPlug_jointDiff.p_combinedName,
+                                                             mPlug_baseRes.p_combinedName))
+                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointMult.p_combinedName,
+                                                               mPlug_jointDiff.p_combinedName,
+                                                               mPlug_jointRes.p_combinedName))
                     
                     
-                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointRes.p_combinedShortName,
-                                                               mPlug_jointFactor.p_combinedShortName,
-                                                               mPlug_segScale.p_combinedShortName))                    
+                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointRes.p_combinedName,
+                                                               mPlug_jointFactor.p_combinedName,
+                                                               mPlug_segScale.p_combinedName))                    
     
                     
                 else:
@@ -1754,8 +1935,9 @@ def ribbon(jointList = None,
                 for arg in l_argBuild:
                     log.debug("|{0}| >> Building arg: {1}".format(_str_func,arg))
                     NodeF.argsToNodes(arg).doBuild()
-                    
-                mPlug_aimResult.doConnectOut('{0}.{1}'.format(mJnt.mNode,'scaleZ'))
+                
+                if not skipAim:
+                    mPlug_aimResult.doConnectOut('{0}.{1}'.format(mJnt.mNode,'scaleZ'))
             
                 if squashStretch == 'simple':
                     for axis in ['scaleX','scaleY']:
@@ -1788,10 +1970,10 @@ def ribbon(jointList = None,
                                                   minValue = 0)
                 
                 l_argBuild = []
-                l_argBuild.append("{0} = {1} * {2}".format(mPlug_aimBaseNorm.p_combinedShortName,
-                                                           mPlug_aimBase.p_combinedShortName,
-                                                           mPlug_masterScale.p_combinedShortName,))
-                
+                l_argBuild.append("{0} = {1} * {2}".format(mPlug_aimBaseNorm.p_combinedName,
+                                                           mPlug_aimBase.p_combinedName,
+                                                           mPlug_masterScale.p_combinedName,))
+
                 
                 #baseSquashScale = distBase / distActual
                 #out scale = baseSquashScale * (outBase / outActual)
@@ -1826,27 +2008,27 @@ def ribbon(jointList = None,
                                                       attrType = 'float')                    
                     
                     #>> x + (y - x) * blend --------------------------------------------------------
-                    l_argBuild.append("{0} = {1} / {2}".format(mPlug_baseRes.p_combinedShortName,
-                                                               mPlug_aimBaseNorm.p_combinedShortName,
+                    l_argBuild.append("{0} = {1} / {2}".format(mPlug_baseRes.p_combinedName,
+                                                               mPlug_aimBaseNorm.p_combinedName,
                                                                "{0}.distance".format(mActive_aim.mNode),
                                                                ))
-                    l_argBuild.append("{0} = 1 + {1}".format(mPlug_aimResult.p_combinedShortName,
-                                                               mPlug_jointMult.p_combinedShortName))
-                    l_argBuild.append("{0} = {1} - 1".format(mPlug_jointDiff.p_combinedShortName,
-                                                             mPlug_baseRes.p_combinedShortName))
-                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointMult.p_combinedShortName,
-                                                               mPlug_jointDiff.p_combinedShortName,
-                                                               mPlug_jointRes.p_combinedShortName))
+                    l_argBuild.append("{0} = 1 + {1}".format(mPlug_aimResult.p_combinedName,
+                                                               mPlug_jointMult.p_combinedName))
+                    l_argBuild.append("{0} = {1} - 1".format(mPlug_jointDiff.p_combinedName,
+                                                             mPlug_baseRes.p_combinedName))
+                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointMult.p_combinedName,
+                                                               mPlug_jointDiff.p_combinedName,
+                                                               mPlug_jointRes.p_combinedName))
                     
                     
-                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointRes.p_combinedShortName,
-                                                               mPlug_jointFactor.p_combinedShortName,
-                                                               mPlug_segScale.p_combinedShortName))                    
+                    l_argBuild.append("{0} = {1} * {2}".format(mPlug_jointRes.p_combinedName,
+                                                               mPlug_jointFactor.p_combinedName,
+                                                               mPlug_segScale.p_combinedName))                    
     
                     
                 else:
-                    l_argBuild.append("{0} = {1} / {2}".format(mPlug_aimResult.p_combinedShortName,
-                                                               mPlug_aimBaseNorm.p_combinedShortName,
+                    l_argBuild.append("{0} = {1} / {2}".format(mPlug_aimResult.p_combinedName,
+                                                               mPlug_aimBaseNorm.p_combinedName,
                                                                "{0}.distance".format(mActive_aim.mNode),
                                                                ))
                 
@@ -1854,8 +2036,9 @@ def ribbon(jointList = None,
                 for arg in l_argBuild:
                     log.debug("|{0}| >> Building arg: {1}".format(_str_func,arg))
                     NodeF.argsToNodes(arg).doBuild()
-                    
-                mPlug_aimResult.doConnectOut('{0}.{1}'.format(mJnt.mNode,'scaleZ'))
+                
+                if not skipAim:
+                    mPlug_aimResult.doConnectOut('{0}.{1}'.format(mJnt.mNode,'scaleZ'))
             
                 if not ml_outFollicles:
                     for axis in ['scaleX','scaleY']:
@@ -1900,22 +2083,22 @@ def ribbon(jointList = None,
                                                             lock=True)                    
                          
                         l_argBuild = []
-                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_outBaseNorm.p_combinedShortName,
-                                                                   mPlug_outBase.p_combinedShortName,
-                                                                   mPlug_masterScale.p_combinedShortName,))
+                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_outBaseNorm.p_combinedName,
+                                                                   mPlug_outBase.p_combinedName,
+                                                                   mPlug_masterScale.p_combinedName,))
                         
                         #baseSquashScale = distBase / distActual
                         #out scale = baseSquashScale * (outBase / outActual)
     
      
                         
-                        l_argBuild.append("{0} = {1} / {2}".format(mPlug_outBaseRes.p_combinedShortName,
+                        l_argBuild.append("{0} = {1} / {2}".format(mPlug_outBaseRes.p_combinedName,
                                                                    '{0}.distance'.format(mActive_out.mNode),
-                                                                   mPlug_outBaseNorm.p_combinedShortName,))
+                                                                   mPlug_outBaseNorm.p_combinedName,))
                         
-                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_outResult.p_combinedShortName,
-                                                                   mPlug_aimResult.p_combinedShortName,
-                                                                   mPlug_outBaseRes.p_combinedShortName))
+                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_outResult.p_combinedName,
+                                                                   mPlug_aimResult.p_combinedName,
+                                                                   mPlug_outBaseRes.p_combinedName))
                         
                         
                         for arg in l_argBuild:
@@ -1955,9 +2138,9 @@ def ribbon(jointList = None,
                                                           minValue = 0)
                         
                         l_argBuild = []
-                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_upBaseNorm.p_combinedShortName,
-                                                                   mPlug_upBase.p_combinedShortName,
-                                                                   mPlug_masterScale.p_combinedShortName,))                    
+                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_upBaseNorm.p_combinedName,
+                                                                   mPlug_upBase.p_combinedName,
+                                                                   mPlug_masterScale.p_combinedName,))                    
                         
                         #baseSquashScale = distBase / distActual
                         #up scale = baseSquashScale * (upBase / upActual)
@@ -1965,13 +2148,13 @@ def ribbon(jointList = None,
                         
     
                         
-                        l_argBuild.append("{0} = {1} / {2}".format(mPlug_upBaseRes.p_combinedShortName,
+                        l_argBuild.append("{0} = {1} / {2}".format(mPlug_upBaseRes.p_combinedName,
                                                                    '{0}.distance'.format(mActive_up.mNode),
-                                                                   mPlug_upBaseNorm.p_combinedShortName,))
+                                                                   mPlug_upBaseNorm.p_combinedName,))
                         
-                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_upResult.p_combinedShortName,
-                                                                   mPlug_aimResult.p_combinedShortName,
-                                                                   mPlug_upBaseRes.p_combinedShortName))
+                        l_argBuild.append("{0} = {1} * {2}".format(mPlug_upResult.p_combinedName,
+                                                                   mPlug_aimResult.p_combinedName,
+                                                                   mPlug_upBaseRes.p_combinedName))
                         
                         
                         for arg in l_argBuild:
@@ -1983,7 +2166,82 @@ def ribbon(jointList = None,
                         for axis in ['scaleY']:
                             mPlug_upResult.doConnectOut('{0}.{1}'.format(mJnt.mNode,axis))                
 
+    if additiveScaleEnds:
+        log.debug("|{0}| >> Additive Scale Ends".format(_str_func)+cgmGEN._str_subLine)
+        
+        for i,mJnt in enumerate( [ml_joints[0],ml_joints[-1]] ):
+            
+            #Active measures ---------------------------------------------------------------------
+            log.debug("|{0}| >> Additve Scale measure for: {1}".format(_str_func,mJnt))
+            
+            #>> Distance nodes
+            mDistanceDag,mDistanceShape = createDist(mJnt, 'additiveEnd')
+            log.debug("|{0}| >> Dist created...".format(_str_func))
+            
+            
 
+            #Connect things
+            #.on loc = position
+            ATTR.connect(ml_follicles[ml_joints.index(mJnt)].mNode+'.translate',
+                         mDistanceShape.mNode+'.startPoint')
+            
+            if not i:
+                ATTR.connect(mFollicleMinV.mNode+'.translate',
+                             mDistanceShape.mNode+'.endPoint')
+                str_tag = 'min'
+            else:
+                ATTR.connect(mFollicleMaxV.mNode+'.translate',
+                             mDistanceShape.mNode+'.endPoint')
+                str_tag = 'max'
+                
+            log.debug("|{0}| >> follicle connected...".format(_str_func))
+                
+            #Normal Base -----------------------------------------------------------------
+            #normalbase = base value * master
+            #mult_normalBase = mc.createNode('multDoubleLinear')
+            #ATTR.connect(mPlug_masterScale.p_combinedName, mult_normalBase + '.input1')
+            #ATTR.set(mult_normalBase,'input2',mDistanceDag.mNode + '.distance')
+            #ATTR.connect(mDistanceDag.mNode + '.distance', mult_normalBase + '.input2')
+            
+            # Base -----------------------------------------------------------------
+            mPlug_aimResult = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                              "{0}_aimAdditiveResult_{1}".format(str_baseName,str_tag),
+                                              attrType = 'float',
+                                              initialValue=0,
+                                              lock=True,
+                                              minValue = 0)
+        
+            mPlug_aimBase = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                            "{0}_aimAdditiveBase_{1}".format(str_baseName,str_tag),
+                                            attrType = 'float',
+                                            lock=True,
+                                            value=ATTR.get('{0}.distance'.format(mDistanceShape.mNode)))
+    
+            mPlug_aimBaseNorm = cgmMeta.cgmAttr(mControlSurface.mNode,
+                                                "{0}_aimAdditveBaseNorm_{1}".format(str_baseName,str_tag),
+                                                attrType = 'float',
+                                                initialValue=0,
+                                                lock=True,
+                                                minValue = 0)
+            log.debug("|{0}| >> Attrs registered...".format(_str_func))
+            
+            l_argBuild = []
+            l_argBuild.append("{0} = {1} * {2}".format(mPlug_aimBaseNorm.p_combinedName,
+                                                       mPlug_aimBase.p_combinedName,
+                                                       mPlug_masterScale.p_combinedName,))
+            l_argBuild.append("{0} = {2} / {1}".format(mPlug_aimResult.p_combinedName,
+                                                       mPlug_aimBaseNorm.p_combinedName,
+                                                       "{0}.distance".format(mDistanceShape.mNode),
+                                                       ))
+        
+            for arg in l_argBuild:
+                log.debug("|{0}| >> Building arg: {1}".format(_str_func,arg))
+                NodeF.argsToNodes(arg).doBuild()
+                
+                
+            if not skipAim:
+                RIGGEN.plug_insertNewValues('{0}.scaleZ'.format(mJnt.mNode),
+                                            [mPlug_aimResult.p_combinedName],replace=False)
             
     #>>> Connect our iModule vis stuff
     if mModule:#if we have a module, connect vis
@@ -2002,16 +2260,27 @@ def ribbon(jointList = None,
         max_influences = 2
         mode_tighten = 'twoBlend'
         blendLength = int_lenJoints/2
+        blendMin = 2
+        _hardLength = 2
+        
+        if extendEnds:
+            blendMin = 4
+            _hardLength = 3
+            mode_tighten = None
+        
         
         if int_lenInfluences > 2:
             mode_tighten = None
-            blendLength = int(int_lenInfluences/2)
+            #blendLength = int(int_lenInfluences/2)
             max_influences = MATH.Clamp( blendLength, 2, 4)
+            blendLength = MATH.Clamp( int(int_lenInfluences/2), 2, 6)
+        
+        if int_lenInfluences == int_lenJoints:
+            _hardLength = 3
             
         #Tighten the weights...
-        _hardLength = 2
-        if extendEnds:
-            _hardLength +=3
+        
+       
             
         if mArcLenCurve:
             log.debug("|{0}| >> Skinning arcLen Curve: {1}".format(_str_func,mArcLenCurve))
@@ -2048,11 +2317,11 @@ def ribbon(jointList = None,
             mSkinCluster.doName()    
         
             #Tighten the weights...
+                        
             RIGSKIN.surface_tightenEnds(mSurf.mNode,
                                         hardLength = _hardLength,
-                                         blendLength=blendLength,
-                                         mode=mode_tighten)
-            
+                                        blendLength=blendLength,
+                                        mode=mode_tighten)
     
     
     if mModule:#if we have a module, connect vis
@@ -2072,106 +2341,465 @@ def ribbon(jointList = None,
     return _res
 
 
-def handleHOLDER(jointList = None,
-           useCurve = None,
-           orientation = 'zyx',
-           secondaryAxis = 'y+',
-           baseName = None,
-           stretchBy = 'translate',
-           advancedTwistSetup = False,
-           extendTwistToEnd = False,
-           reorient = False,
-           moduleInstance = None,
-           parentGutsTo = None):
-    """
-    Root of the segment setup.
-    Inspiriation from Jason Schleifer's work as well as
-
-    http://faithofthefallen.wordpress.com/2008/10/08/awesome-spine-setup/
-    on twist methods.
-
-    Latest rewrite - July 2017
-
-    :parameters:
-        jointList(joints - None) | List or metalist of joints
-        useCurve(nurbsCurve - None) | Which curve to use. If None. One Created
-        orientation(string - zyx) | What is the joints orientation
-        secondaryAxis(maya axis arg(y+) | Only necessary when no module provide for orientating
-        baseName(string - None) | baseName string
-        stretchBy(string - trans/scale/None) | How the joint will scale
-        advancedTwistSetup(bool - False) | Whether to do the cgm advnaced twist setup
-        addMidTwist(bool - True) | Whether to setup a mid twist on the segment
-        moduleInstance(cgmModule - None) | cgmModule to use for connecting on build
-        extendTwistToEnd(bool - False) | Whether to extned the twist to the end by default
-
-    :returns:
-        mIKHandle, mIKEffector, mIKSolver, mi_splineCurve
-        
-
-    :raises:
-        Exception | if reached
-
-    """ 
-    _str_func = 'splineIK'
-    #try:
-    #>>> Verify =============================================================================================
-    ml_joints = cgmMeta.validateObjListArg(jointList,mType = 'cgmObject', mayaType=['joint'], noneValid = False)
-    l_joints = [mJnt.p_nameShort for mJnt in ml_joints]
-    int_lenJoints = len(ml_joints)#because it's called repeatedly
-    mi_useCurve = cgmMeta.validateObjArg(useCurve,mayaType=['nurbsCurve'],noneValid = True)
-
-    mi_mayaOrientation = VALID.simpleOrientation(orientation)
-    str_orientation = mi_mayaOrientation.p_string
-    str_secondaryAxis = VALID.stringArg(secondaryAxis,noneValid=True)
-    str_baseName = VALID.stringArg(baseName,noneValid=True)
-    
-    
-    #module -----------------------------------------------------------------------------------------------
-    mModule = cgmMeta.validateObjArg(moduleInstance,noneValid = True)
-    try:mModule.isModule()
-    except:mModule = False
-
-    mi_rigNull = False	
-    if mModule:
-        log.debug("|{0}| >> Module found. mModule: {1}...".format(_str_func,mModule))                                    
-        mi_rigNull = mModule.rigNull	
-        if str_baseName is None:
-            str_baseName = mModule.getPartNameBase()#Get part base name	    
-    if not str_baseName:str_baseName = 'testSplineIK' 
-    #...
-    
-    str_stretchBy = VALID.stringArg(stretchBy,noneValid=True)		
-    b_advancedTwistSetup = VALID.boolArg(advancedTwistSetup)
-    b_extendTwistToEnd= VALID.boolArg(extendTwistToEnd)
-
-    if int_lenJoints<3:
-        pprint.pprint(vars())
-        raise ValueError,"needs at least three joints"
-    
-    if parentGutsTo is None:
-        mGroup = cgmMeta.cgmObject(name = 'newgroup')
-        mGroup.addAttr('cgmName', str(str_baseName), lock=True)
-        mGroup.addAttr('cgmTypeModifier','segmentStuff', lock=True)
-        mGroup.doName()
-    else:
-        mGroup = cgmMeta.validateObjArg(parentGutsTo,'cgmObject',False)
-
-    #Good way to verify an instance list? #validate orientation             
-    #> axis -------------------------------------------------------------
-    axis_aim = VALID.simpleAxis("{0}+".format(str_orientation[0]))
-    axis_aimNeg = axis_aim.inverse
-    axis_up = VALID.simpleAxis("{0}+".format(str_orientation [1]))
-
-    v_aim = axis_aim.p_vector#aimVector
-    v_aimNeg = axis_aimNeg.p_vector#aimVectorNegative
-    v_up = axis_up.p_vector   #upVector
-
-    outChannel = str_orientation[2]#outChannel
-    upChannel = '{0}up'.format(str_orientation[1])#upChannel
-    l_param = []  
 
 
 def handle(startJoint,
+           endJoint,
+           solverType = 'ikRPsolver',
+           rpHandle = False,
+           lockMid = True,
+           addLengthMulti = False,
+           stretch = False, globalScaleAttr = None,
+           controlObject = None,
+           baseName = None,
+           orientation = 'zyx',
+           nameSuffix = None,
+           newSolver = False,#Create a new solver node for this?
+           handles = [],#If one given, assumed to be mid, can't have more than length of joints
+           moduleInstance = None):
+    """
+    @kws
+    l_jointChain1(list) -- blend list 1
+    l_jointChain2(list) -- blend list 2
+    l_blendChain(list) -- result chain
+    solverType -- 'ikRPsolver','ikSCsolver'
+    baseName -- 
+    nameSuffix -- add to nameBase
+    rpHandle(bool/string) -- whether to have rphandle setup, object to use if string or MetaClass
+    lockMid(bool) --
+    driver(attr arg) -- driver attr
+    globalScaleAttr(string/cgmAttr) -- global scale attr to connect in
+    addLengthMulti(bool) -- whether to setup lengthMultipliers
+    controlObject(None/string) -- whether to have control to put attrs on, object to use if string or MetaClass OR will use ikHandle
+    channels(list) -- channels to blend
+    stretch(bool/string) -- stretch options - translate/scale
+    moduleInstance -- instance to connect stuff to
+
+    """
+    try:
+        _str_func = 'handle'
+        log.debug("|{0}| >> ...".format(_str_func))  
+        
+    
+        ml_rigObjectsToConnect = []
+        ml_rigObjectsToParent = []
+    
+        #>>> Data gather and arg check
+        if solverType not in ['ikRPsolver','ikSCsolver']:
+            raise ValueError,"|{0}| >> Invalid solverType: {1}".format(_str_func,solverType)
+        
+        
+        mi_mayaOrientation = VALID.simpleOrientation(orientation)
+        str_orientation = mi_mayaOrientation.p_string
+        #str_secondaryAxis = VALID.stringArg(secondaryAxis,noneValid=True)
+        str_baseName = VALID.stringArg(baseName,noneValid=True)
+        
+        #module ---------------------------------------------------------------------------------------
+        mModule = cgmMeta.validateObjArg(moduleInstance,noneValid = True)
+        #try:mModule.isModule()
+        #except:mModule = False
+    
+        mi_rigNull = False	
+        if mModule:
+            log.debug("|{0}| >> Module found. mModule: {1}...".format(_str_func,mModule))
+            mi_rigNull = mModule.rigNull	
+            if str_baseName is None:
+                str_baseName = mModule.getPartNameBase()#Get part base name	    
+        if not str_baseName:str_baseName = 'testIK'     
+    
+        #Joint chain ======================================================================================
+        mStart = cgmMeta.validateObjArg(startJoint,'cgmObject',noneValid=False)
+        mEnd = cgmMeta.validateObjArg(endJoint,'cgmObject',noneValid=False)
+        if not mEnd.isChildOf(mStart):
+            raise ValueError,"|{0}| >> {1} not a child of {2}".format(_str_func,endJoint,startJoint)
+            
+        ml_jointChain = mStart.getListPathTo(mEnd,asMeta=True)
+        #ml_jointChain = cgmMeta.validateObjListArg(l_jointChain,'cgmObject',noneValid=False)
+        l_jointChain = [mObj.mNode for mObj in ml_jointChain]
+        if len(ml_jointChain)<3 and solverType in ['rpSolver']:
+            raise ValueError,"|{0}| >> {1} len less than 3 joints. solver: {2}".format(_str_func,len(ml_jointChain,solverType))
+            
+        _foundPrerred = False
+        for mJnt in ml_jointChain:
+            for attr in ['preferredAngleX','preferredAngleY','preferredAngleZ']:
+                if mJnt.getAttr(attr):
+                    log.debug("|{0}| >> Found preferred...".format(_str_func))                  
+                    _foundPrerred = True
+                    break
+        
+        #Attributes =====================================================================================
+        #Master global control
+        d_MasterGlobalScale = cgmMeta.validateAttrArg(globalScaleAttr,noneValid=True)    
+        
+        #Stretch
+        if stretch and stretch not in ['translate','scale']:
+            log.debug("|{0}| >> Invalid stretch arg: {1}. Using 'translate'".format(_str_func,stretch))
+            stretch = 'translate'
+        if stretch == 'scale':
+            raise NotImplementedError,"|{0}| >> Scale method not done".format(_str_func)
+            
+        #Handles =======================================================================================
+        ml_handles = cgmMeta.validateObjListArg(handles,'cgmObject',noneValid=True)
+        if len(ml_handles)>len(ml_jointChain):#Check handle length to joint list
+            raise ValueError,"|{0}| >> More handles than joints. joints: {1}| handles: {2}.".format(_str_func,len(ml_jointChain),len(ml_handles))
+            
+    
+        mRPHandle = cgmMeta.validateObjArg(rpHandle,'cgmObject',noneValid=True)
+        if mRPHandle and mRPHandle in ml_handles:
+            raise NotImplementedError,"|{0}| >> rpHandle can't be a measure handle".format(_str_func)
+            
+        #Control object
+        mControl = cgmMeta.validateObjArg(controlObject,'cgmObject',noneValid=True)
+        if mControl:
+            log.debug("|{0}| >> mControl: {1}.".format(_str_func,mControl))                  
+    
+        #Figure out our aimaxis
+        str_localAimSingle = orientation[0]
+        
+        
+        
+        if newSolver:
+            _node = mc.createNode(solverType)
+            mSolver = cgmMeta.asMeta(_node)
+            mSolver.rename("{0}_{1}".format(str_baseName,solverType))
+            _useSolver = mSolver.mNode
+        else:
+            _useSolver = solverType
+    
+        #Create IK handle ==================================================================================
+        buffer = mc.ikHandle( sj=mStart.mNode, ee=mEnd.mNode,
+                              solver = _useSolver, forceSolver = True,
+                              snapHandleFlagToggle=True )  	
+    
+    
+        #>>> Name
+        log.debug(buffer)
+        mIKHandle = cgmMeta.asMeta(buffer[0],'cgmObject',setClass=True)
+        mIKHandle.addAttr('cgmName',str_baseName,attrType='string',lock=True)
+        mIKHandle.doName()
+    
+        ml_rigObjectsToConnect.append(mIKHandle)
+    
+        mIKEffector = cgmMeta.asMeta(buffer[1],'cgmNode',setClass=True)
+        mIKEffector.addAttr('cgmName',str_baseName,attrType='string',lock=True)    
+        mIKEffector.doName()
+    
+        #>>> Control
+        if not mControl:
+            mControl = mIKHandle
+        else:
+            mIKHandle.parent = mControl
+            
+        #>>> Store our start and end
+        mIKHandle.connectChildNode(mStart,'jointStart','ikOwner')
+        mIKHandle.connectChildNode(mEnd,'jointEnd','ikOwner')
+        
+        #>>>Stetch #===============================================================================
+        mPlug_lockMid = False  
+        ml_distanceShapes = []
+        ml_distanceObjects = []   
+        mPlug_globalScale = False
+        
+        if stretch:
+            log.debug("|{0}| >> Stretch setup...".format(_str_func))
+            mPlug_globalScale = cgmMeta.cgmAttr(mIKHandle.mNode,'masterScale',value = 1.0, lock =True, hidden = True)
+            
+            
+            #Attributes ----------------------------------------------------------
+            d_baseAttrs = {}
+            for a in ['distIKRaw','distBaseNormal','distActiveNormal',
+                      'distFullLengthNormal','scaleFactorRaw','scaleFactor']:
+                d_baseAttrs[a] = cgmMeta.cgmAttr(mIKHandle.mNode, a , attrType = 'float',
+                                                 value = 1, lock =True , hidden = True)
+            
+            
+            #Get our distance -----------------------------------------------------------------------
+            f_baseDist = DIST.get_distance_between_targets(l_jointChain)
+
+            #--------------------------------------------------------------------------------------
+            mPlug_autoStretch = cgmMeta.cgmAttr(mControl,'autoStretch',initialValue = 1,
+                                                defaultValue = 1, keyable = True,
+                                                attrType = 'float', minValue = 0, maxValue = 1)
+            
+            if len(ml_jointChain) == 3 and lockMid:
+                log.debug("|{0}| >> MidLock setup possible...".format(_str_func))
+                
+                if lockMid:mPlug_lockMid = cgmMeta.cgmAttr(mControl,'lockMid',
+                                                           initialValue = 0, attrType = 'float',
+                                                           keyable = True, minValue = 0, maxValue = 1)
+        
+                if addLengthMulti:
+                    mPlug_lengthUpr= cgmMeta.cgmAttr(mControl,'lengthUpr',attrType='float',value = 1, defaultValue = 1,minValue=0,keyable = True)
+                    mPlug_lengthLwr = cgmMeta.cgmAttr(mControl,'lengthLwr',attrType='float',value = 1, defaultValue = 1,minValue=0,keyable = True)	
+                    ml_multiPlugs = [mPlug_lengthUpr,mPlug_lengthLwr]
+        
+            #Check our handles for stretching
+            if len(ml_handles)!= len(ml_jointChain):#we need a handle per joint for measuring purposes
+                log.debug("create_IKHandle>>> Making handles")
+                ml_buffer = ml_handles
+                ml_handles = []
+                for j in ml_jointChain:
+                    m_match = False
+                    for h in ml_buffer:
+                        if MATH.is_vector_equivalent(j.getPosition(),h.getPosition()):
+                            log.debug("create_IKHandle>>> '%s' handle matches: '%s'"%(h.getShortName(),j.getShortName()))
+                            m_match = h
+                    if not m_match:#make one
+                        m_match = j.doLoc(nameLink = True)
+                        m_match.addAttr('cgmTypeModifier','stretchMeasure')
+                        m_match.doName()
+                    ml_handles.append(m_match)
+                    ml_rigObjectsToConnect.append(m_match)
+    
+                #>>>TODO Add hide stuff
+        
+                #>>>Do Handles
+                mMidHandle = False   
+                if ml_handles:
+                    if len(ml_handles) == 1:
+                        mMidHandle = ml_handles[0]
+                    else:
+                        mid = int((len(ml_handles))/2)
+                        mMidHandle = ml_handles[mid]
+                    
+                    log.debug("|{0}| >> mid handle: {1}".format(_str_func,mMidHandle))
+
+            #Overall stretch ----------------------------------------------------------------------
+            md_baseDistReturn = RIGCREATE.distanceMeasure(ml_handles[0].mNode,ml_handles[-1].mNode,baseName=str_baseName)
+            md_baseDistReturn['mEnd'].p_parent = mControl
+            ml_rigObjectsToParent.append(md_baseDistReturn['mDag'])
+            
+            mPlug_rawDistance = cgmMeta.cgmAttr(md_baseDistReturn['mShape'],'distance')
+            
+            # ['distIKStretch','stretchMultiplier','distIKNormal','distFullLengthNormal']
+            d_baseAttrs['distIKRaw'].value = md_baseDistReturn['mShape'].distance
+            """
+            #dist ikStretch normal -----------------------------------------------------------------            
+            arg = "{0} = {1} * {2}".format(d_baseAttrs['distIKNormal'].p_combinedName,
+                                           md_baseDistReturn['mShape'].distance,
+                                           mPlug_globalScale.p_combinedName)
+            NodeF.argsToNodes(arg).doBuild()    
+            
+            #ik stretch normal ----------------------------------------------------------------------
+            _arg = "{0} = {1} / {2}".format(d_baseAttrs['stretchMultiplier'].p_combinedName,
+                                             mPlug_rawDistance.mNode,
+                                             d_baseAttrs['distIKNormal'].p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()            """
+            
+            #Normal base -----------------------------------------------------------------------
+            _arg = "{0} = {1} * {2}".format(d_baseAttrs['distBaseNormal'].p_combinedName,
+                                            mPlug_rawDistance.value,
+                                            mPlug_globalScale.p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()
+            
+            #Normal active -----------------------------------------------------------------------
+            _arg = "{0} = {1} / {2}".format(d_baseAttrs['distActiveNormal'].p_combinedName,
+                                          mPlug_rawDistance.p_combinedName,
+                                          mPlug_globalScale.p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()            
+            
+
+            #dist fullLenth normal -----------------------------------------------------------------            
+            _arg = "{0} = {1} * {2}".format(d_baseAttrs['distFullLengthNormal'].p_combinedName,
+                                            f_baseDist,
+                                            mPlug_globalScale.p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()            
+            
+            #scaleFactorRaw  -----------------------------------------------------------------------
+            _arg = "{0} = {1} / {2}".format(d_baseAttrs['scaleFactorRaw'].p_combinedName,
+                                            mPlug_rawDistance.p_combinedName,
+                                            d_baseAttrs['distFullLengthNormal'].p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()
+            
+            """
+            #scaleFactorRawMid  -----------------------------------------------------------------------
+            _arg = "{0} = {1} / {2}".format(d_baseAttrs['scaleFactorRawMid'].p_combinedName,
+                                            d_baseAttrs['distActiveNormal'].p_combinedName,
+                                            d_baseAttrs['distBaseNormal'].p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()            
+            
+            """
+            
+            #scaleFactorReal ---------------------------------------------------------------
+            _arg = "{0} = if {1} >= {2}: {3} else 1".format(d_baseAttrs['scaleFactor'].p_combinedName,
+                                                            mPlug_rawDistance.p_combinedName,
+                                                            d_baseAttrs['distFullLengthNormal'].p_combinedName,
+                                                            d_baseAttrs['scaleFactorRaw'].p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()            
+            
+
+
+            #Create our blend to stretch or not - blend normal base and stretch base
+            mStretchBlend = cgmMeta.cgmNode(nodeType= 'blendTwoAttr')
+            mStretchBlend.addAttr('cgmName','%s_stretchBlend'%(str_baseName),lock=True)
+            mStretchBlend.doName()
+            ATTR.set(mStretchBlend.mNode,"input[0]",1)
+            d_baseAttrs['scaleFactor'].doConnectOut("%s.input[1]"%mStretchBlend.mNode)
+            mPlug_autoStretch.doConnectOut("%s.attributesBlender"%mStretchBlend.mNode)
+            
+            
+            #--------------------------------------------------------------------------------------------
+            if lockMid:
+                #Make our distance objects per segment ===========================================================
+                l_segments = LISTS.get_listPairs(ml_handles)
+                for i,seg in enumerate(l_segments):#Make our measure nodes
+                    buffer =  RIGCREATE.distanceMeasure(seg[0].mNode,seg[-1].mNode,baseName="{0}_{1}".format(str_baseName,i))
+                    ml_distanceShapes.append(buffer['mShape'])
+                    ml_distanceObjects.append(buffer['mDag'])
+                    #>>>TODO Add hide stuff
+                ml_rigObjectsToParent.extend(ml_distanceObjects)
+                ml_rigObjectsToConnect.extend(ml_handles)            
+            
+            
+
+            #Per joint setup...
+            #--------------------------------------------------------------------------------------------
+            l_jntAttrs = ['distBase','distNormal','stretchReg']
+            if lockMid:
+                l_jntAttrs.extend(['stretchMid',
+                                   'distMidBase','distMidBaseNormal',
+                                   'distMidRaw','distMidNormal'])
+                
+            for i,mJnt in enumerate(ml_jointChain[:-1]):
+                md_jntAttrs = {}
+
+                for a in l_jntAttrs:
+                    md_jntAttrs[a] = cgmMeta.cgmAttr(mIKHandle.mNode, "{0}_{1}".format(a,i) ,
+                                                     attrType = 'float',
+                                                     value = 1, lock =True , hidden = True)
+                    
+                md_jntAttrs['distBase'].value = ATTR.get(ml_jointChain[i+1].mNode,
+                                                         "t{0}".format(str_localAimSingle))
+                
+                #Normal base -----------------------------------------------------------------------
+                _arg = "{0} = {1} * {2}".format(md_jntAttrs['distNormal'].p_combinedName,
+                                                md_jntAttrs['distBase'].p_combinedName,
+                                                mPlug_globalScale.p_combinedName)
+                NodeF.argsToNodes(_arg).doBuild()
+                
+                _arg = "{0} = {1} * {2}.output".format(md_jntAttrs['stretchReg'].p_combinedName,
+                                                       md_jntAttrs['distBase'].p_combinedName,
+                                                       mStretchBlend.mNode)
+                NodeF.argsToNodes(_arg).doBuild()
+                
+                
+                if lockMid:
+                    md_jntAttrs['distBase'].value = ml_distanceShapes[i].distance
+                    md_jntAttrs['distMidRaw'].doConnectIn("%s.distance"%ml_distanceShapes[i].mNode)	  
+                    
+                    #Normal base distance
+                    arg = "%s = %s * %s"%(md_jntAttrs['distMidBaseNormal'].p_combinedName,
+                                          md_jntAttrs['distBase'].p_combinedName,
+                                          mPlug_globalScale.p_combinedName)
+                    NodeF.argsToNodes(arg).doBuild()
+                
+                    #Normal distance
+                    arg = "%s = %s / %s"%(md_jntAttrs['distMidNormal'].p_combinedName,
+                                          md_jntAttrs['distMidRaw'].p_combinedName,
+                                          mPlug_globalScale.p_combinedName)
+                    NodeF.argsToNodes(arg).doBuild()
+
+                
+                #Blend --------------------------------------------------------------
+                mBlend_jnt = cgmMeta.cgmNode(nodeType= 'blendTwoAttr')
+                mBlend_jnt.addAttr('cgmName','%s_stretch_to_lockMid'%(mJnt.getBaseName()),lock=True)
+                mBlend_jnt.doName()
+                if mPlug_lockMid:
+                    mPlug_lockMid.doConnectOut("%s.attributesBlender"%mBlend_jnt.mNode)                    
+                    
+    
+                if stretch == 'translate':
+                    if lockMid:
+                        #Base Normal, Dist Normal
+                        md_jntAttrs['stretchReg'].doConnectOut("%s.input[0]"%mBlend_jnt.mNode)
+                        md_jntAttrs['distMidNormal'].doConnectOut("%s.input[1]"%mBlend_jnt.mNode)
+                        ATTR.connect("%s.output"%mBlend_jnt.mNode,"%s.t%s"%(ml_jointChain[i+1].mNode,str_localAimSingle))
+                    else:
+                        md_jntAttrs['stretchReg'].doConnectOut("{0}.t{1}".format(ml_jointChain[i+1].mNode,str_localAimSingle))
+    
+        #>>> addLengthMulti
+        if addLengthMulti:
+            log.debug("|{0}| >> addLengthMulti...".format(_str_func))
+            
+            if len(ml_jointChain[:-1]) == 2:
+                #grab the plug
+    
+                i_mdLengthMulti = cgmMeta.cgmNode(mc.createNode('multiplyDivide'))
+                i_mdLengthMulti.operation = 1
+                i_mdLengthMulti.doStore('cgmName',str_baseName)
+                i_mdLengthMulti.addAttr('cgmTypeModifier','lengthMulti')
+                i_mdLengthMulti.doName()
+    
+                l_mdAxis = ['X','Y','Z']
+                for i,i_jnt in enumerate(ml_jointChain[:-1]):
+                    #grab the plug
+                    mPlug_driven = cgmMeta.cgmAttr(ml_jointChain[i+1],'t%s'%str_localAimSingle)
+                    plug = ATTR.break_connection(mPlug_driven.p_combinedName)
+                    if not plug:raise StandardError,"create_IKHandle>>> Should have found a plug on: %s.t%s"%(ml_jointChain[i+1].mNode,str_localAimSingle)
+    
+                    ATTR.connect(plug,#>>
+                                 '%s.input1%s'%(i_mdLengthMulti.mNode,l_mdAxis[i]))#Connect the old plug data
+                    ml_multiPlugs[i].doConnectOut('%s.input2%s'%(i_mdLengthMulti.mNode,l_mdAxis[i]))#Connect in the mutliDriver	
+                    mPlug_driven.doConnectIn('%s.output.output%s'%(i_mdLengthMulti.mNode,l_mdAxis[i]))#Connect it back to our driven
+    
+            else:
+                log.error("|{0}| >> addLengthMulti only currently supports 2 segments. Found: {1}".format(_str_func,len(ml_jointChain[:-1])))
+                
+    
+        #>>> rpSetup
+        if solverType == 'ikRPsolver' and rpHandle:
+            log.debug("|{0}| >> RP Handle setup...".format(_str_func))
+            
+            if not mRPHandle:
+                #Make one
+                mRPHandle = mMidHandle.doLoc()
+                mRPHandle.addAttr('cgmTypeModifier','poleVector')
+                mRPHandle.doName()
+                ml_rigObjectsToConnect.append(mRPHandle)
+            cBuffer = mc.poleVectorConstraint(mRPHandle.mNode,mIKHandle.mNode)
+    
+            #Fix rp
+            #rotValue = mStart.getAttr('r%s'%str_localAimSingle)    
+            #if not cgmMath.isFloatEquivalent(rotValue,0):#if we have a value, we need to fix it
+                #IKHandle_fixTwist(mIKHandle)	
+    
+    
+        #>>> Plug in global scale
+        if d_MasterGlobalScale and mPlug_globalScale:
+            d_MasterGlobalScale['mi_plug'].doConnectOut(mPlug_globalScale.p_combinedName)
+    
+        #>>> Connect our iModule vis stuff
+        if mModule:#if we have a module, connect vis
+            for mObj in ml_rigObjectsToConnect:
+                mObj.overrideEnabled = 1		
+                cgmMeta.cgmAttr(mModule.rigNull.mNode,'gutsVis',lock=False).doConnectOut("%s.%s"%(mObj.mNode,'overrideVisibility'))
+                cgmMeta.cgmAttr(mModule.rigNull.mNode,'gutsLock',lock=False).doConnectOut("%s.%s"%(mObj.mNode,'overrideDisplayType'))    
+            for mObj in ml_rigObjectsToParent:
+                mObj.parent = mModule.rigNull.mNode
+    
+        #>>> Return dict
+        d_return = {'mHandle':mIKHandle,'mEffector':mIKEffector}
+        if mPlug_lockMid:
+            d_return['mPlug_lockMid'] = mPlug_lockMid	
+            d_return['ml_measureObjects']=ml_distanceObjects	
+        if stretch:
+            d_return['mPlug_autoStretch'] = mPlug_autoStretch
+            d_return['ml_distHandles']=ml_handles
+        if mRPHandle:
+            d_return['mRPHandle'] = mRPHandle
+        if addLengthMulti:
+            d_return['ml_lengthMultiPlugs'] = ml_multiPlugs
+    
+        if not _foundPrerred:log.warning("create_IKHandle>>> No preferred angle values found. The chain probably won't work as expected: %s"%l_jointChain)
+        
+        return d_return   
+    except Exception,err:cgmGEN.cgmException(Exception,err)
+
+
+
+
+
+def handleBAK(startJoint,
            endJoint,
            solverType = 'ikRPsolver',
            rpHandle = False,
@@ -2221,14 +2849,14 @@ def handle(startJoint,
         #str_secondaryAxis = VALID.stringArg(secondaryAxis,noneValid=True)
         str_baseName = VALID.stringArg(baseName,noneValid=True)
         
-        #module -----------------------------------------------------------------------------------------------
+        #module ---------------------------------------------------------------------------------------
         mModule = cgmMeta.validateObjArg(moduleInstance,noneValid = True)
         #try:mModule.isModule()
         #except:mModule = False
     
         mi_rigNull = False	
         if mModule:
-            log.debug("|{0}| >> Module found. mModule: {1}...".format(_str_func,mModule))                                    
+            log.debug("|{0}| >> Module found. mModule: {1}...".format(_str_func,mModule))
             mi_rigNull = mModule.rigNull	
             if str_baseName is None:
                 str_baseName = mModule.getPartNameBase()#Get part base name	    
@@ -2240,7 +2868,6 @@ def handle(startJoint,
         if not mEnd.isChildOf(mStart):
             raise ValueError,"|{0}| >> {1} not a child of {2}".format(_str_func,endJoint,startJoint)
             
-        
         ml_jointChain = mStart.getListPathTo(mEnd,asMeta=True)
         #ml_jointChain = cgmMeta.validateObjListArg(l_jointChain,'cgmObject',noneValid=False)
         l_jointChain = [mObj.mNode for mObj in ml_jointChain]
@@ -2261,7 +2888,7 @@ def handle(startJoint,
         
         #Stretch
         if stretch and stretch not in ['translate','scale']:
-            log.debug("|{0}| >> Invalid stretch arg: {1}. Using 'translate'".format(_str_func,stretch))                  
+            log.debug("|{0}| >> Invalid stretch arg: {1}. Using 'translate'".format(_str_func,stretch))
             stretch = 'translate'
         if stretch == 'scale':
             raise NotImplementedError,"|{0}| >> Scale method not done".format(_str_func)
@@ -2276,21 +2903,15 @@ def handle(startJoint,
         if mRPHandle and mRPHandle in ml_handles:
             raise NotImplementedError,"|{0}| >> rpHandle can't be a measure handle".format(_str_func)
             
-    
         #Control object
         mControl = cgmMeta.validateObjArg(controlObject,'cgmObject',noneValid=True)
         if mControl:
             log.debug("|{0}| >> mControl: {1}.".format(_str_func,mControl))                  
     
         #Figure out our aimaxis
-        #v_localAim = distance.returnLocalAimDirection(ml_jointChain[0].mNode,ml_jointChain[1].mNode)
-        #str_localAim = dictionary.returnVectorToString(v_localAim)
-        #str_localAimSingle = str_localAim[0]
         str_localAimSingle = orientation[0]
-        #log.debug("create_IKHandle>>> vector aim: %s | str aim: %s"%(v_localAim,str_localAim))
     
     
-
         #Create IK handle ==================================================================================
         buffer = mc.ikHandle( sj=mStart.mNode, ee=mEnd.mNode,
                               solver = solverType, forceSolver = True,
@@ -2301,7 +2922,6 @@ def handle(startJoint,
         log.debug(buffer)
         mIKHandle = cgmMeta.asMeta(buffer[0],'cgmObject',setClass=True)
         mIKHandle.addAttr('cgmName',str_baseName,attrType='string',lock=True)
-        #mIKHandle.doStore('cgmType','IKHand')
         mIKHandle.doName()
     
         ml_rigObjectsToConnect.append(mIKHandle)
@@ -2326,16 +2946,35 @@ def handle(startJoint,
         ml_distanceShapes = []
         ml_distanceObjects = []   
         mPlug_globalScale = False
+        
         if stretch:
             log.debug("|{0}| >> Stretch setup...".format(_str_func))
+            mPlug_globalScale = cgmMeta.cgmAttr(mIKHandle.mNode,'masterScale',value = 1.0, lock =True, hidden = True)
+            
+            #Get our distance -----------------------------------------------------------------------
+            #mPlug_ikRegScale = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikRegScale',value = 1.0, lock =True, hidden = True)
+            #mPlug_distSumRaw = cgmMeta.cgmAttr(mIKHandle.mNode,'distanceSumLive',value = 1.0, lock =True, hidden = True)
+            #mPlug_distSumNormal = cgmMeta.cgmAttr(mIKHandle.mNode,'result_distSumLive',value = 1.0, lock =True, hidden = True)
+            
+            
+            
+            f_baseDist = DIST.get_distance_between_targets(l_jointChain)
+            mPlug_lengthFullNormal = cgmMeta.cgmAttr(mIKHandle,'result_fullLengthNormal',keyable = False, hidden=True, attrType = 'float')
+            _arg = "{0} = {1} * {2}".format(mPlug_lengthFullNormal.p_combinedName,
+                                            f_baseDist,
+                                            mPlug_globalScale.p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()
+            #--------------------------------------------------------------------------------------
+            
             
             mPlug_autoStretch = cgmMeta.cgmAttr(mControl,'autoStretch',initialValue = 1, defaultValue = 1, keyable = True, attrType = 'float', minValue = 0, maxValue = 1)
             
             if len(ml_jointChain) == 3 and lockMid:
                 log.debug("|{0}| >> MidLock setup possible...".format(_str_func))
                 
-                if lockMid:mPlug_lockMid = cgmMeta.cgmAttr(mControl,'lockMid',initialValue = 0, attrType = 'float', keyable = True, minValue = 0, maxValue = 1)
-        
+                if lockMid:mPlug_lockMid = cgmMeta.cgmAttr(mControl,'lockMid',
+                                                           initialValue = 0, attrType = 'float',
+                                                           keyable = True, minValue = 0, maxValue = 1)
         
                 if addLengthMulti:
                     mPlug_lengthUpr= cgmMeta.cgmAttr(mControl,'lengthUpr',attrType='float',value = 1, defaultValue = 1,minValue=0,keyable = True)
@@ -2372,13 +3011,9 @@ def handle(startJoint,
                         mMidHandle = ml_handles[mid]
                     
                     log.debug("|{0}| >> mid handle: {1}".format(_str_func,mMidHandle))
-                        
-    
-    
+
             #Overall stretch
-            mPlug_globalScale = cgmMeta.cgmAttr(mIKHandle.mNode,'masterScale',value = 1.0, lock =True, hidden = True)
-    
-    
+
             md_baseDistReturn = RIGCREATE.distanceMeasure(ml_handles[0].mNode,ml_handles[-1].mNode,baseName=str_baseName)
             
             md_baseDistReturn['mEnd'].p_parent = mControl
@@ -2389,39 +3024,50 @@ def handle(startJoint,
             mPlug_baseDistRaw.doConnectIn("%s.distance"%md_baseDistReturn['mShape'].mNode)
             mPlug_baseDistNormal = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikBaseNormal',value = 1.0, lock =True, hidden = True)
             mPlug_ikDistNormal = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikDistNormal',value = 1.0, lock =True, hidden = True)	
-            mPlug_ikScale = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikScale',value = 1.0, lock =True, hidden = True)
+            mPlug_ikScaleRaw = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikScaleRaw',value = 1.0, lock =True, hidden = True)
+            mPlug_ikScale = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikScale',value = 1.0, lock =True, hidden = True)            
             mPlug_ikClampScale = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikClampScale',value = 1.0, lock =True, hidden = True)
             mPlug_ikClampMax = cgmMeta.cgmAttr(mIKHandle.mNode,'result_ikClampMax',value = 1.0, lock =True, hidden = True)
     
-            #Normal base
-            arg = "%s = %s * %s"%(mPlug_baseDistNormal.p_combinedShortName,
-                                  mPlug_baseDist.p_combinedShortName,
-                                  mPlug_globalScale.p_combinedShortName)
+            #EVEN METHOD ==================================================================================================
+            #Normal base -----------------------------------------------------------------------
+            arg = "%s = %s * %s"%(mPlug_baseDistNormal.p_combinedName,
+                                  mPlug_baseDist.p_combinedName,
+                                  mPlug_globalScale.p_combinedName)
             NodeF.argsToNodes(arg).doBuild()
     
-            #Normal Length
-            arg = "%s = %s / %s"%(mPlug_ikDistNormal.p_combinedShortName,
-                                  mPlug_baseDistRaw.p_combinedShortName,
-                                  mPlug_globalScale.p_combinedShortName)
+            #Normal Length-------------------------------------------------------------------
+            arg = "%s = %s / %s"%(mPlug_ikDistNormal.p_combinedName,
+                                  mPlug_baseDistRaw.p_combinedName,
+                                  mPlug_globalScale.p_combinedName)
             NodeF.argsToNodes(arg).doBuild()	
     
-            #ik scale
-            arg = "%s = %s / %s"%(mPlug_ikScale.p_combinedShortName,
-                                  mPlug_baseDistRaw.p_combinedShortName,
-                                  mPlug_baseDistNormal.p_combinedShortName)
+            #ik scale raw---------------------------------------------------
+            arg = "%s = %s / %s"%(mPlug_ikScaleRaw.p_combinedName,
+                                  mPlug_baseDistRaw.p_combinedName,
+                                  mPlug_baseDistNormal.p_combinedName)
             NodeF.argsToNodes(arg).doBuild()	
-    
-            #ik max clamp
+            
+            
+            #ik scale real ----------------------------------------
+            _arg = "{0} = if {1} <= {2}: {3} else 1".format(mPlug_ikScale.p_combinedName,
+                                                            mPlug_baseDistNormal.p_combinedName,
+                                                            mPlug_lengthFullNormal.p_combinedName,
+                                                            mPlug_ikScaleRaw.p_combinedName)
+            NodeF.argsToNodes(_arg).doBuild()            
+            
+
+            #ik max clamp-------------------------------------------------------------
             """ This is for maya 2013 (at least) which honors the max over the  min """
-            arg = "%s = if %s >= 1: %s else 1"%(mPlug_ikClampMax.p_combinedShortName,
-                                                mPlug_ikScale.p_combinedShortName,
-                                                mPlug_ikScale.p_combinedShortName)
+            arg = "%s = if %s >= 1: %s else 1"%(mPlug_ikClampMax.p_combinedName,
+                                                mPlug_ikScale.p_combinedName,
+                                                mPlug_ikScale.p_combinedName)
             NodeF.argsToNodes(arg).doBuild()
     
-            #ik clamp scale
-            arg = "%s = clamp(1,%s,%s)"%(mPlug_ikClampScale.p_combinedShortName,
-                                         mPlug_ikClampMax.p_combinedShortName,
-                                         mPlug_ikScale.p_combinedShortName)
+            #ik clamp scale-----------------------------------------------
+            arg = "%s = clamp(1,%s,%s)"%(mPlug_ikClampScale.p_combinedName,
+                                         mPlug_ikClampMax.p_combinedName,
+                                         mPlug_ikScale.p_combinedName)
             NodeF.argsToNodes(arg).doBuild()	
     
             #Create our blend to stretch or not - blend normal base and stretch base
@@ -2431,10 +3077,9 @@ def handle(startJoint,
             ATTR.set(mi_stretchBlend.mNode,"input[0]",1)
             mPlug_ikClampScale.doConnectOut("%s.input[1]"%mi_stretchBlend.mNode)
             mPlug_autoStretch.doConnectOut("%s.attributesBlender"%mi_stretchBlend.mNode)
-    
+            #--------------------------------------------------------------------------------------------
             
-            #Make our distance objects per segment
-            #=========================================================================
+            #Make our distance objects per segment ===========================================================
             l_segments = LISTS.get_listPairs(ml_handles)
             for i,seg in enumerate(l_segments):#Make our measure nodes
                 buffer =  RIGCREATE.distanceMeasure(seg[0].mNode,seg[-1].mNode,baseName="{0}_{1}".format(str_baseName,i))
@@ -2442,8 +3087,23 @@ def handle(startJoint,
                 ml_distanceObjects.append(buffer['mDag'])
                 #>>>TODO Add hide stuff
             ml_rigObjectsToParent.extend(ml_distanceObjects)
-            ml_rigObjectsToConnect.extend(ml_handles)
+            ml_rigObjectsToConnect.extend(ml_handles)            
             
+            
+            #Reg method ===========================================================================================
+            """
+            arg = "{0} = {1} * {2}".format(mPlug_distSumNormal.p_combinedName,
+                                           mPlug_distSumRaw.p_combinedName,
+                                           mPlug_globalScale.p_combinedName)
+            
+            NodeF.argsToNodes(arg).doBuild()
+            
+            argSum = ' + '.join(["{0}.distance".format(mShape.mNode) for mShape in ml_distanceShapes])
+            arg = "{0} = {1}".format(mPlug_distSumRaw.p_combinedName,
+                                     argSum)"""
+            
+            #--------------------------------------------------------------------------------------------
+    
             for i,i_jnt in enumerate(ml_jointChain[:-1]):
                 #Make some attrs
                 mPlug_baseDist= cgmMeta.cgmAttr(mIKHandle.mNode,"baseDist_%s"%i,attrType = 'float' , value = ml_distanceShapes[i].distance , lock=True,minValue = 0)
@@ -2458,33 +3118,33 @@ def handle(startJoint,
                 mPlug_rawDist.doConnectIn("%s.distance"%ml_distanceShapes[i].mNode)	  
     
                 #Normal base distance
-                arg = "%s = %s * %s"%(mPlug_normalBaseDist.p_combinedShortName,
+                arg = "%s = %s * %s"%(mPlug_normalBaseDist.p_combinedName,
                                       mPlug_baseDist.p_combinedName,
-                                      mPlug_globalScale.p_combinedShortName)
+                                      mPlug_globalScale.p_combinedName)
                 NodeF.argsToNodes(arg).doBuild()
     
                 #Normal distance
-                arg = "%s = %s / %s"%(mPlug_normalDist.p_combinedShortName,
+                arg = "%s = %s / %s"%(mPlug_normalDist.p_combinedName,
                                       mPlug_rawDist.p_combinedName,
-                                      mPlug_globalScale.p_combinedShortName)
+                                      mPlug_globalScale.p_combinedName)
                 NodeF.argsToNodes(arg).doBuild()
     
                 #Stretch Distance
-                arg = "%s = %s * %s.output"%(mPlug_stretchDist.p_combinedShortName,
+                arg = "%s = %s * %s.output"%(mPlug_stretchDist.p_combinedName,
                                              mPlug_normalBaseDist.p_combinedName,
                                              mi_stretchBlend.getShortName())
                 NodeF.argsToNodes(arg).doBuild()
     
                 #Then pull the global out of the stretchdistance 
-                arg = "%s = %s / %s"%(mPlug_stretchNormalDist.p_combinedShortName,
+                arg = "%s = %s / %s"%(mPlug_stretchNormalDist.p_combinedName,
                                       mPlug_stretchDist.p_combinedName,
                                       mPlug_globalScale.p_combinedName)
                 NodeF.argsToNodes(arg).doBuild()	    
     
                 #Segment scale
-                arg = "%s = %s / %s"%(mPlug_resultSegmentScale.p_combinedShortName,
+                arg = "%s = %s / %s"%(mPlug_resultSegmentScale.p_combinedName,
                                       mPlug_normalDist.p_combinedName,
-                                      mPlug_baseDist.p_combinedShortName)
+                                      mPlug_baseDist.p_combinedName)
                 NodeF.argsToNodes(arg).doBuild()
     
                 #Create our blend to stretch or not - blend normal base and stretch base
@@ -2580,6 +3240,8 @@ def handle(startJoint,
 
 
 
+
+
 def handle_fixTwist(ikHandle, aimAxis = None):
     #>>> Data gather and arg check    
     _str_func = 'handle_fixTwist'
@@ -2620,14 +3282,14 @@ def handle_fixTwist(ikHandle, aimAxis = None):
         mIKHandle.twist = -mPlug_rot.value#try inversed driven joint rotate value first
 
     if not MATH.is_float_equivalent(mPlug_rot.value,0,2):#if we have a value, we need to fix it
-        log.debug("|{0}| >> drivenAttr='{1}',driverAttr='{2}.twist',minIn = -180, maxIn = 180, maxIterations = 75,matchValue=0.0001".format(_str_func,mPlug_rot.p_combinedShortName,mIKHandle.p_nameShort))        
+        log.debug("|{0}| >> drivenAttr='{1}',driverAttr='{2}.twist',minIn = -180, maxIn = 180, maxIterations = 75,matchValue=0.0001".format(_str_func,mPlug_rot.p_combinedName,mIKHandle.p_nameShort))        
         
         RIGGEN.matchValue_iterator(drivenAttr="%s.r%s"%(mStartJoint.mNode,aimAxis),
                                    driverAttr="%s.twist"%mIKHandle.mNode,
                                    minIn = -170, maxIn = 180,
                                    maxIterations = 30,
                                    matchValue=0)
-        log.debug("|{0}| >> drivenAttr='{1}',driverAttr='{2}.twist',minIn = -180, maxIn = 180, maxIterations = 75,matchValue=0.0001".format(_str_func,mPlug_rot.p_combinedShortName,mIKHandle.p_nameShort))        
+        log.debug("|{0}| >> drivenAttr='{1}',driverAttr='{2}.twist',minIn = -180, maxIn = 180, maxIterations = 75,matchValue=0.0001".format(_str_func,mPlug_rot.p_combinedName,mIKHandle.p_nameShort))        
         
         #log.debug("rUtils.matchValue_iterator(drivenAttr='%s.r%s',driverAttr='%s.twist',minIn = -180, maxIn = 180, maxIterations = 75,matchValue=0.0001)"%(mStartJoint.getShortName(),str_localAimSingle,mIKHandle.getShortName()))
     return True

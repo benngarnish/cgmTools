@@ -34,6 +34,7 @@ from cgm.core.lib import node_utils as NODE
 from cgm.core.lib import attribute_utils as ATTR
 from cgm.core.lib import list_utils as LISTS
 from cgm.core.lib import euclid as EUCLID
+import cgm.core.lib.name_utils as NAMES
 
 reload(LISTS)
 reload(SHARED)
@@ -79,7 +80,7 @@ def get(obj = None, pivot = 'rp', space = 'ws', targets = None, mode = 'xform', 
               
         if '[' in _obj:
             log.debug("|{0}| >> component mode...".format(_str_func))        
-            if ":" in _obj:
+            if ":" in _obj.split('[')[-1]:
                 raise ValueError,"|{0}| >>Please specify one obj. Component list found: {1}".format(_str_func,_obj)
             #_cType = VALID.get_mayaType(_obj)
             _l_comp = VALID.get_component(_obj)
@@ -327,6 +328,7 @@ def get_bb_size(arg = None, shapes = False, mode = None, asEuclid = False):
         mode(varied): 
             True/'max': Only return max value
             'min': Only min
+            maxFill - [max,max.max]
 
     :returns
         boundingBox size(list)
@@ -365,6 +367,9 @@ def get_bb_size(arg = None, shapes = False, mode = None, asEuclid = False):
         return max(_res)
     elif mode in ['min']:
         return min(_res)
+    elif mode == 'maxFill':
+        _max = max(_res)
+        return [_max,_max,_max]
     else:
         log.error("|{0}| >> Unknown mode. Returning default. {1} ".format(_str_func,mode))
     return _res    
@@ -425,7 +430,7 @@ def get_axisBox_size(arg = None, children = False, mode = None, asEuclid = False
             log.error("|{0}| >> Unknown mode. Returning default. {1} ".format(_str_func,mode))
         return _res            
     except Exception,err:
-        cgmGen.cgmExceptCB(Exception,err)
+        cgmGen.cgmException(Exception,err,msg=vars())
 
 def get_uv_position(mesh, uvValue,asEuclid = False):
     """
@@ -590,8 +595,25 @@ def get_midPointDict(sourceList,forceBBCenter = False):
     _d_info['rotations'] = _l_rot
     _d_info['position'] = MATH.get_average_pos(_l_pos)
     _d_info['rotation'] = MATH.get_average_pos(_l_rot)
-    return _d_info 
+    return _d_info
 
+
+def get_curveMidPointFromDagList(sourceList):
+    _str_func = 'get_curveMidPointFromDagList'
+
+    l_pos = [get(o) for o in sourceList]
+    knot_len = len(l_pos)+3-1
+    _created = mc.curve (d=3, ep = l_pos, k = [i for i in range(0,knot_len)], os=True)    
+    shp =  mc.listRelatives(_created, s=True, fullPath = True)[0]
+    _min = ATTR.get(shp,'minValue')
+    _max = ATTR.get(shp,'maxValue')
+    _mid = (_max - _min)/2.0
+    
+    pos = mc.pointPosition("{0}.u[{1}]".format(shp,_mid), w=True)
+    mc.delete(_created)
+    return pos
+    
+    
 def get_positionPlug(obj):
     _str_func = 'get_positionPlug'
     
@@ -601,6 +623,24 @@ def get_positionPlug(obj):
     for attr in l_elibiblePlugs:
         if ATTR.has_attr(obj,attr):
             _res = "{0}.{1}".format(obj,d_plugTypes.get(attr))
-    return _res      
+    return _res
+
+def create_loc(obj):
+    _str_func = 'create_loc'
+    infoDict = get_info(obj)
+    
+    _loc = mc.spaceLocator(name="{0}_loc".format(NAMES.get_base(obj)))[0]
+    pos =infoDict['position']
+    mc.move (pos[0],pos[1],pos[2], _loc, ws=True)
+    mc.xform(_loc, roo=infoDict['rotateOrder'],p=True)
+    mc.xform(_loc, ro=infoDict['rotation'], ws = True)
+    mc.xform(_loc, ra=infoDict['rotateAxis'],p=True)
+
+    #mTarget = r9Meta.getMObject(target)
+    mc.xform(_loc, rp=infoDict['position'], ws = True, p=True)        
+    if infoDict.get('scalePivot'):mc.xform(_loc, sp=infoDict['scalePivot'], ws = True, p=True)
+    
+    return _loc
+    
 
 #Vector ===================================================================================================

@@ -33,6 +33,7 @@ import maya.cmds as mc
 from cgm.core import cgm_General as cgmGEN
 from cgm.core import cgm_Meta as cgmMeta
 from cgm.core import cgm_PuppetMeta as PUPPETMETA
+import cgm.core.cgm_RigMeta as cgmRIGMETA
 
 from cgm.core.lib import curve_Utils as CURVES
 from cgm.core.lib import attribute_utils as ATTR
@@ -40,13 +41,14 @@ from cgm.core.lib import position_utils as POS
 from cgm.core.lib import math_utils as MATH
 from cgm.core.lib import distance_utils as DIST
 from cgm.core.lib import snap_utils as SNAP
-from cgm.core.lib import rigging_utils as RIGGING
+from cgm.core.lib import rigging_utils as CORERIG
 import cgm.core.lib.rigging_utils as CORERIG
 from cgm.core.rigger.lib import joint_Utils as JOINTS
 from cgm.core.lib import search_utils as SEARCH
 from cgm.core.lib import rayCaster as RAYS
 from cgm.core.cgmPy import validateArgs as VALID
 from cgm.core.cgmPy import path_Utils as PATH
+import cgm.core.lib.node_utils as NODES
 import cgm.core.rig.joint_utils as COREJOINTS
 import cgm.core.classes.NodeFactory as NODEFACTORY
 import cgm.core.lib.locator_utils as LOC
@@ -56,11 +58,158 @@ import cgm.core.rig.general_utils as RIGGEN
 import cgm.core.lib.surface_Utils as SURF
 import cgm.core.lib.transform_utils as TRANS
 import cgm.core.classes.NodeFactory as NodeF
+import cgm.core.mrs.lib.ModuleControlFactory as MODULECONTROL
 
-for m in BLOCKSHARE,MATH,DIST,RAYS,RIGGEN:
+for m in BLOCKSHARE,MATH,DIST,RAYS,RIGGEN,SNAPCALLS:
     reload(m)
 
 from cgm.core.cgmPy import os_Utils as cgmOS
+
+
+def eyeLook_get(self,autoBuild=False):
+    _str_func = 'eyeLook_get'
+    
+    log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
+    log.debug("{0}".format(self))
+    mBlock = self.mBlock
+    
+    mModule = self.mModule
+    mRigNull = self.mRigNull
+    mPuppet = self.mPuppet
+
+    try:return mModule.eyeLook
+    except:pass
+    try:return mi_module.moduleParent.eyeLook
+    except:pass
+    
+    ml_puppetEyelooks = mPuppet.msgList_get('eyeLook')
+    if ml_puppetEyelooks:
+        if len(ml_puppetEyelooks) == 1 and ml_puppetEyelooks[0]:
+            return ml_puppetEyelooks[0]
+        else:
+            raise StandardError,"More than one puppet eye look"
+        
+    if autoBuild:
+        return eyeLook_verify(self)
+    return False
+
+@cgmGEN.Timer
+def eyeLook_verify(self):
+    _str_func = 'eyeLook_verify'
+    try:
+        log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
+        log.debug("{0}".format(self))
+        mBlock = self.mBlock
+        
+        mModule = self.mModule
+        mRigNull = self.mRigNull
+        mPuppet = self.mPuppet
+        mHandleFactory = mBlock.asHandleFactory()
+        
+        _eyeLook = eyeLook_get(self)
+        if _eyeLook:
+            log.debug("|{0}| >> Found existing eyeLook...".format(_str_func))                      
+            return _eyeLook
+        
+        if mBlock.blockType not in ['eye']:
+            raise ValueError,"blocktype must be eye. Found {0} | {1}".format(mBlock.blockType,mBlock)
+        
+        #Data... -----------------------------------------------------------------------
+        log.debug("|{0}| >> Get data...".format(_str_func))
+        #_size = mHandleFactory.get_axisBox_size(mBlock.getMessage('bbHelper'))
+        
+        try:
+            _size = self.v_baseSize
+            _sizeAvg = self.f_sizeAvg             
+        except:
+            _size = [mBlock.blockScale * v for v in mBlock.baseSize]
+            _sizeAvg = MATH.average(_size)
+        
+        #Create shape... -----------------------------------------------------------------------        
+        log.debug("|{0}| >> Creating shape...".format(_str_func))
+        mCrv = cgmMeta.asMeta( CURVES.create_fromName('arrow4Fat',
+                                                      direction = 'z+',
+                                                      size = _sizeAvg ,
+                                                      absoluteSize=False),'cgmObject',setClass=True)
+        mCrv.doSnapTo(mBlock.mNode)
+        pos = mBlock.getPositionByAxisDistance('z+',
+                                               _sizeAvg * 4)
+        
+        mCrv.p_position = 0,pos[1],pos[2]
+        
+        
+        mBlockParent = mBlock.p_blockParent
+        if mBlockParent:
+            mCrv.doStore('cgmName',mBlockParent.cgmName + '_eyeLook')
+            mBlockParent.asHandleFactory().color(mCrv.mNode)
+        else:
+            mCrv.doStore('cgmName','eyeLook')
+            mHandleFactory.color(mCrv.mNode)
+        
+        mCrv.doName()
+        
+
+        #Register control... -----------------------------------------------------------------------        
+        log.debug("|{0}| >> Registering Control... ".format(_str_func))
+        d_buffer = MODULECONTROL.register(mCrv,
+                                          mirrorSide= 'center',
+                                          mirrorAxis="translateX,rotateY,rotateZ",
+                                          addSpacePivots = 2)
+        
+        mCrv = d_buffer['mObj']        
+        
+        
+        #Dynparent... -----------------------------------------------------------------------        
+        log.debug("|{0}| >> Dynparent setup.. ".format(_str_func))
+        ml_dynParents = copy.copy(self.ml_dynParentsAbove)
+        ml_dynParents.extend(mCrv.msgList_get('spacePivots'))
+        ml_dynParents.extend(copy.copy(self.ml_dynEndParents))
+        
+        mDynParent = cgmRIGMETA.cgmDynParentGroup(dynChild=mCrv,dynMode=0)
+        
+
+        for o in ml_dynParents:
+            mDynParent.addDynParent(o)
+        mDynParent.rebuild()
+        
+        #Connections... -----------------------------------------------------------------------        
+        log.debug("|{0}| >> Connections... ".format(_str_func))
+        mModule.connectChildNode(mCrv,'eyeLook')
+        mPuppet.msgList_append('eyeLook',mCrv,'puppet')
+        
+        if mBlockParent:
+            log.debug("|{0}| >> Adding to blockParent...".format(_str_func))                    
+            mBlockParent.moduleTarget.connectChildNode(mCrv,'eyeLook')
+            mBlockParentRigNull = mBlockParent.moduleTarget.rigNull
+            mBlockParentRigNull.msgList_append('controlsAll',mCrv)
+            mBlockParentRigNull.moduleSet.append(mCrv)
+        
+        
+        #Connections... -----------------------------------------------------------------------        
+        log.debug("|{0}| >> Heirarchy... ".format(_str_func))        
+        mCrv.masterGroup.p_parent = self.mDeformNull
+        
+        for link in 'masterGroup','dynParentGroup':
+            if mCrv.getMessage(link):
+                mCrv.getMessageAsMeta(link).dagLock(True)        
+        
+        return mCrv
+    except Exception,error:
+        cgmGEN.cgmException(Exception,error,msg=vars())
+
+   
+
+
+    try:#moduleParent Stuff =======================================================
+        if mi_moduleParent:
+            try:
+                for mCtrl in self.ml_controlsAll:
+                    mi_parentRigNull.msgList_append('controlsAll',mCtrl)
+            except Exception,error: raise Exception,"!Controls all connect!| %s"%error	    
+            try:mi_parentRigNull.moduleSet.extend(self.ml_controlsAll)
+            except Exception,error: raise Exception,"!Failed to set module objectSet! | %s"%error
+    except Exception,error:raise Exception,"!Module Parent registration! | %s"%(error)	    
+
 
 
 def get_controlSpaceSetupDict(self):
@@ -80,14 +229,25 @@ def get_controlSpaceSetupDict(self):
     else:
         d_controlSpaces = {'addConstrainGroup':True}
     log.debug("|{0}| >> d_controlSpaces {1}".format(_str_func,d_controlSpaces))
+    
     return d_controlSpaces
 
 def gather_rigBlocks():
+    _str_func = 'gather_rigBlocks'
+    
     mGroup = get_blockGroup()
     
     for mObj in r9Meta.getMetaNodes(mTypes = 'cgmRigBlock'):
+        log.debug("|{0}| >> Checking: {1}".format(_str_func,mObj))
+        
         if not mObj.parent:
             mObj.parent = mGroup
+            
+        for link in ['noTransTemplateNull','noTransDefineNull','noTransPrerigNull']:
+            mLink = mObj.getMessageAsMeta(link)
+            if mLink and not mLink.parent:
+                log.debug("|{0}| >> {1} | {2}".format(_str_func,link,mLink))            
+                mLink.parent = mGroup
 
 def get_blockGroup():
     if not mc.objExists('cgmRigBlocksGroup'):
@@ -438,8 +598,73 @@ def build_skeleton(positionList = [], joints = 1, axisAim = 'z+', axisUp = 'y+',
 
     #>>HelperJoint setup???
 
+def controls_lockDown(ml_controls):
+    _str_func = 'controls_lockDown'
+    log.debug("|{0}| >> ...".format(_str_func))
+    
+    for mCtrl in ml_controls:
+        if mCtrl.hasAttr('radius'):
+            ATTR.set_hidden(mCtrl.mNode,'radius',True)
+        
+        for link in 'masterGroup','dynParentGroup','aimGroup','worldOrientGroup':
+            if mCtrl.getMessage(link):
+                mCtrl.getMessageAsMeta(link).dagLock(True)    
+
+def control_convertToWorldIK(mCtrl=None):
+    """
+    """
+    _str_func = 'control_convertToWorldIK'
+    rot = mCtrl.p_orient
+    mGrp_zero = mCtrl.doGroup(True,True,asMeta=True,typeModifier = 'worldOrient')
+    
+
+    xDot = mCtrl.getTransformDirection(MATH.Vector3.right()).dot(MATH.Vector3.forward())
+    yDot = mCtrl.getTransformDirection(MATH.Vector3.up()).dot(MATH.Vector3.forward())
+    zDot = mCtrl.getTransformDirection(MATH.Vector3.forward()).dot(MATH.Vector3.forward())
+    
+    xUpDot = mCtrl.getTransformDirection(MATH.Vector3.right()).dot(MATH.Vector3.up())
+    yUpDot = mCtrl.getTransformDirection(MATH.Vector3.up()).dot(MATH.Vector3.up())
+    zUpDot = mCtrl.getTransformDirection(MATH.Vector3.forward()).dot(MATH.Vector3.up())
+    
+    #Get our up and vector
+    closestForward = "x"
+    closestUp = "x"
+    highestDot = xDot
+    highestUpDot = xUpDot
+    
+    if(abs(yDot) > abs(highestDot)):
+        closestForward = "y"
+        highestDot = yDot
+    
+    if(abs(zDot) > abs(highestDot)):
+        closestForward = "z"
+        highestDot = zDot
+    
+    if(abs(yUpDot) > abs(highestUpDot)):
+        closestUp = "y"
+        highestUpDot = yUpDot
+    
+    if(abs(zUpDot) > abs(highestUpDot)):
+        closestUp = "z"
+        highestUpDot = zUpDot
+    
+    if(highestDot < 0):
+        closestForward = "{0}-".format(closestForward)
+    if(highestUpDot < 0):
+        closestUp = "{0}-".format(closestUp)
+        
+    print('closest forward axis is "%s" and closest up axis is "%s"' % (closestForward, closestUp))    
+    pos_aim = DIST.get_pos_by_vec_dist(mCtrl.p_position, [0,0,1], 10.0)
+    
+    SNAP.aim_atPoint(mGrp_zero.mNode, pos_aim, closestForward, mode='world', vectorUp=[0,1,0] )
+    
+    mCtrl.p_orient = rot
+    d = {'rotateX':mCtrl.rotateX,'rotateY':mCtrl.rotateY,'rotateZ':mCtrl.rotateZ}
+    mCtrl.addAttr('defaultValues',d)
+    return
+    
  
-def build_loftMesh(root, jointCount = 3, degree = 3, cap = True, merge = True):
+def build_loftMesh(root, jointCount = 3, degree = 3, cap = True, merge = True,reverseSurfaceNormals=True):
     """
     Core rig block factory. Runs processes for rig blocks.
 
@@ -460,7 +685,7 @@ def build_loftMesh(root, jointCount = 3, degree = 3, cap = True, merge = True):
     #tess method - general, uType 1, vType 2+ joint count
     
     #>>Body -----------------------------------------------------------------
-    _res_body = mc.loft(_l_targets, o = True, d = degree, po = 1 )
+    _res_body = mc.loft(_l_targets, o = True, d = degree, po = 1,reverseSurfaceNormals=reverseSurfaceNormals )
 
     _inputs = mc.listHistory(_res_body[0],pruneDagObjects=True)
     _tessellate = _inputs[0]
@@ -539,7 +764,7 @@ def build_jointProxyMeshOLD(root,degree = 3, jointUp = 'y+'):
     for i,c in enumerate(_l_newCurves[:-1]):
         _pair = [c,_l_newCurves[i+1]]
         _mesh = create_loftMesh(_pair, name="{0}_{1}".format(_name,i))
-        RIGGING.match_transform(_mesh,_l_joints[i])
+        CORERIG.match_transform(_mesh,_l_joints[i])
         _l_new.append(_mesh)
     
     #...clean up 
@@ -547,7 +772,8 @@ def build_jointProxyMeshOLD(root,degree = 3, jointUp = 'y+'):
     #>>Parent to the joints ----------------------------------------------------------------- 
     return _l_new
 
-def create_loftMesh(targets = None, name = 'test', degree = 3, divisions = 1, cap = True, merge = True, form = 1 ):
+def create_loftMesh(targets = None, name = 'test', degree = 3, divisions = 2,
+                    cap = True, merge = True,form = 1,planar=False,reverseSurfaceNormals=True ):
     """
     Create lofted mesh from target curves.
 
@@ -575,7 +801,14 @@ def create_loftMesh(targets = None, name = 'test', degree = 3, divisions = 1, ca
     #tess method - general, uType 1, vType 2+ joint count
     
     #>>Body -----------------------------------------------------------------
-    _res_body = mc.loft(targets, o = True, d = degree, po = 1 )
+    _ss = 1
+    if degree == 1:
+        _loftDegree = 1
+        _ss = divisions
+    else:
+        _loftDegree = 3
+        
+    _res_body = mc.loft(targets, o = True, d = _loftDegree, po = 1, ss=_ss, autoReverse=True,reverseSurfaceNormals=False )
     mTarget1 = cgmMeta.cgmObject(targets[0])
     l_cvs = mc.ls("{0}.cv[*]".format(mTarget1.getShapes()[0]),flatten=True)
     points = len(l_cvs)
@@ -584,17 +817,26 @@ def create_loftMesh(targets = None, name = 'test', degree = 3, divisions = 1, ca
     _inputs = mc.listHistory(_res_body[0],pruneDagObjects=True)
     _tessellate = _inputs[0]
     
-    _d = {'format':form,#Fit
-          'polygonType':1,#'quads',
-          'vNumber':points,
-          'uNumber': 1 + divisions}
+
+    if degree == 1:
+        _d = {'format':3,#Fit
+              'polygonType':1,#'quads',
+              'vNumber':points,
+              'uNumber': 1 + divisions}
+    else:
+        _d = {'format':form,#Fit              
+              'polygonType':1,#'quads',
+              'vNumber':points,
+              'uNumber': 1 + divisions}
     for a,v in _d.iteritems():
         ATTR.set(_tessellate,a,v)
         
     #mc.polySoftEdge(_res_body[0], a = 30, ch = 1)
-        
-    #mc.polyNormal(_res_body[0],nm=0)
-    #mc.polySetToFaceNormal(_res_body[0],setUserNormal = True)
+    
+    #if degree ==1:
+        ##mc.polyNormal(_res_body[0],nm=0)
+        #mc.polySetToFaceNormal(_res_body[0],setUserNormal = True)
+        #mc.polyNormal(_res_body[0], normalMode = 0, userNormalMode=1,ch=0)
     
     if merge:
         #Get our merge distance
@@ -638,9 +880,15 @@ def create_loftMesh(targets = None, name = 'test', degree = 3, divisions = 1, ca
         _res = _res_body
     else:
         _res = _res_body
+    
+    if degree == 1:
+        mc.polyNormal(_res_body[0],nm=0)
+    
+    if planar:
+        mc.polySetToFaceNormal(_res_body[0],setUserNormal = True)#THIS WILL MAKE GEO SMOOTH
+        #mc.polyNormal(_res_body[0], normalMode = 0, userNormalMode=1,ch=0)
+       # mc.polySetToFaceNormal(_res_body[0],setUserNormal = True)
         
-    mc.polyNormal(_res_body[0], normalMode = 4, userNormalMode=1,ch=0)
-    #mc.polySetToFaceNormal(_res_body[0],setUserNormal = True)
     return _res[0]    
 
 def create_remesh(mesh = None, joints = None, curve=None, positions = None,
@@ -753,7 +1001,7 @@ def get_blockScale(self,plug='blockScale',ml_joints = None):
     
     #mCrv = cgmMeta.validateObjArg(crv,'cgmObject',setClass=True)
     CORERIG.shapeParent_in_place(mCrv.mNode,crv,False)
-    mCrv.rename('{0}_measureCrv'.format( self.d_module['partName']))
+    mCrv.rename('{0}_measureCrv'.format( plug ))
     
     
     mRigNull.connectChildNode(mCrv,plug_curve,'rigNull')
@@ -835,6 +1083,36 @@ def register_mirrorIndices(self, ml_controls = []):
     
     return ml_controls
 
+
+def rigNodes_store(self):
+    """
+    :parameters:
+
+    :returns:
+        
+    :raises:
+        Exception | if reached
+
+    """
+    _str_func = 'rigNodes_store'
+    log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
+    log.debug("{0}".format(self))
+    
+    l_postNodes = SEARCH.get_nodeSnapShot()
+    _res = []
+    for o in l_postNodes:
+        if o not in self.l_preNodesBuffer:
+            _res.append(o)
+            
+
+    if self.__dict__.get('mRigNull'):
+        self.mRigNull.connectChildrenNodes(_res,'rigNodes','rigBlock')
+    else:
+        self.mPuppet.connectChildrenNodes(_res,'rigNodes','rigBlock')
+        
+    print _res
+
+
 @cgmGEN.Timer
 def get_dynParentTargetsDat(self):
     """
@@ -900,7 +1178,7 @@ def get_dynParentTargetsDat(self):
 
 
 @cgmGEN.Timer
-def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, upVector = None, uValues = [], offset = None, size = None,connectionPoints=9):
+def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, upVector = None, uValues = [], offset = None, size = None,f_factor = None,connectionPoints=6):
     """
     :parameters:
         self(RigBlocks.rigFactory)
@@ -923,12 +1201,16 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
         _short = self.mBlock.mNode
         _str_func = 'shapes_build ( {0} )'.format(_short)
         
+        
+        _dir = self.d_module.get('direction')
         if aimVector is None:
-            str_aim = self.d_orientation['str'][1] + '-'
+            if _dir and _dir.lower() == 'left':
+                str_aim = self.d_orientation['mOrientation'].p_outNegative.p_string
+            else:
+                str_aim = self.d_orientation['mOrientation'].p_out.p_string        
         else:
             str_aim = VALID.simpleAxis(aimVector).p_string
             
-        
         mRigNull = self.mRigNull
         ml_shapes = []
         mMesh_tmp = None
@@ -965,7 +1247,6 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                     'limbSegmentHandleBack',
                     'simpleCast']:
             #Get our cast mesh        
-            
             ml_handles = self.mBlock.msgList_get('prerigHandles',asMeta = True)
 
             mMesh_tmp =  self.mBlock.atUtils('get_castMesh')
@@ -1009,13 +1290,14 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                     #log.debug("|{0}| >> created: {1} ...".format(_str_func,offsetCrv))
                     #mc.delete(baseCrv)
                     #mTrans = mTar.doCreateAt()
-                    #RIGGING.shapeParent_in_place(mTrans.mNode, crv, False)
+                    #CORERIG.shapeParent_in_place(mTrans.mNode, crv, False)
                     ml_shapes.append(cgmMeta.validateObjArg(baseCrv))
                     
             elif mode in ['segmentHandle','ikHandle','frameHandle','castHandle','limbHandle','limbSegmentHandleBack','limbSegmentHandle','simpleCast',
                           'ikEnd','ikBase']:
                 
-                f_factor = (maxU-minU)/(20)
+                if f_factor is None:
+                    f_factor = (maxU-minU)/(20)
                 if targets:
                     ml_fkJoints = ml_targets
                 else:
@@ -1080,7 +1362,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                             l_mainCurves.append(crv_connect)
                             
                         for crv in l_mainCurves[1:]:
-                            RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+                            CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
                             
                         ml_shapes.append(cgmMeta.validateObjArg(l_mainCurves[0]))
                             
@@ -1134,7 +1416,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                         l_mainCurves.append(crv_connect)
                         
                     for crv in l_mainCurves[1:]:
-                        RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+                        CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
                         
                     ml_shapes.append(cgmMeta.validateObjArg(l_mainCurves[0]))
                     
@@ -1153,14 +1435,11 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                     l_vectors.append(  MATH.get_vector_of_two_points(ml_fkJoints[-2].p_position, ml_fkJoints[-1].p_position) )
                     l_vectors.append( l_vectors[-1])#...add it again
                     """
-                    
                     l_failSafes = MATH.get_splitValueList(minU,maxU,
                                                           len(ml_fkJoints))                    
                     
                     #...Get our uValues...
                     l_uValues = []
-                    #l_sets = []
-                    
                     
                     for i,mObj in enumerate(ml_fkJoints):
                         _short = mObj.mNode
@@ -1173,12 +1452,13 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                             _v = l_failSafes[i]
                         l_uValues.append( _v )
                     
+                    reload(SURF)
                     l_curves = SURF.get_splitValues(str_meshShape,
                                                     l_uValues,
                                                     mode='u',
                                                     insertMax=True,
-                                                    preInset = f_factor,
-                                                    postInset = -f_factor,
+                                                    preInset = f_factor*.25,
+                                                    postInset = -f_factor*.25,
                                                     curvesCreate=True,
                                                     curvesConnect=True,
                                                     connectionPoints=connectionPoints,
@@ -1204,7 +1484,6 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                     #...Get our uValues...
                     l_uValues = []
                     #l_sets = []
-                    
                     
                     for i,mObj in enumerate(ml_fkJoints):
                         _short = mObj.mNode
@@ -1303,7 +1582,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                             l_mainCurves.append(crv_connect)
                             
                         for crv in l_mainCurves[1:]:
-                            RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+                            CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
                             
                         ml_shapes.append(cgmMeta.validateObjArg(l_mainCurves[0]))                    
                 elif mode == 'simpleCast':#================================================================
@@ -1340,9 +1619,9 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                             _v = l_failSafes[i]
                         l_uValues.append( _v )
                         
-                    #l_uValues.append( l_uValues[-1] + (maxU - l_uValues[-1])/2 )
-                    #l_uValues.append(maxU)
+
                 
+                    
                     ml_shapes = []
                     _add = f_factor/2
                     
@@ -1364,24 +1643,28 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                         
                         l_mainCurves.append(endCrv)
                         
-                        """
+                        
                         log.debug("|{0}| >> {1} | Making connectors".format(_str_func,i))
                         d_epPos = {}
+                    
                         for i,crv in enumerate(l_mainCurves):
-                            mCrv = cgmMeta.cgmObject(crv,'cgmObject')
-                            for ii,ep in enumerate(mCrv.getComponents('ep',True)):
+                            _l = CURVES.getUSplitList(crv,connectionPoints,rebuild=True,rebuildSpans=30)[:-1]
+                    
+                            for ii,p in enumerate(_l):
                                 if not d_epPos.get(ii):
                                     d_epPos[ii] = []
-                                    
                                 _l = d_epPos[ii]
-                                _l.append(POS.get(ep))
-                                
+                                _l.append(p)
+                    
                         for k,points in d_epPos.iteritems():
-                            crv_connect = CURVES.create_fromList(posList=points)
-                            l_mainCurves.append(crv_connect)
-                        """
+                            try:
+                                crv_connect = CURVES.create_fromList(posList=points)
+                                l_mainCurves.append(crv_connect)
+                            except Exception,err:
+                                print err
+
                         for crv in l_mainCurves[1:]:
-                            RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+                            CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
                             
                         ml_shapes.append(cgmMeta.validateObjArg(l_mainCurves[0]))
                                         
@@ -1476,7 +1759,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                         
                         for crv in l_mainCurves[1:]:
                             log.debug("|{0}| >> combining: {1}".format(_str_func,crv))
-                            RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+                            CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
                             
                         mCrv = cgmMeta.validateObjArg(l_mainCurves[0])
                         mCrv.rename('shapeCast_{0}'.format(i))
@@ -1508,7 +1791,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
 
                                 crv = CURVES.create_fromName(name='semiSphere',
                                                              direction = 'z+',
-                                                             size = offset*2)
+                                                             size = offset)
                                 l_shapes.append(crv)
                                 mCrv = cgmMeta.validateObjArg(crv,'cgmObject')
                                 
@@ -1528,7 +1811,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
 
                         for crv in l_shapes[1:]:
                             log.debug("|{0}| >> combining: {1}".format(_str_func,crv))
-                            RIGGING.shapeParent_in_place(l_shapes[0], crv, False)
+                            CORERIG.shapeParent_in_place(l_shapes[0], crv, False)
                             
                         ml_shapes.append(cgmMeta.validateObjArg(l_shapes[0],'cgmObject'))
     
@@ -1584,7 +1867,7 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
                         l_mainCurves.append(crv_connect)
                         
                     for crv in l_mainCurves[1:]:
-                        RIGGING.shapeParent_in_place(l_mainCurves[0], crv, False)
+                        CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
                         
                     ml_shapes.append(cgmMeta.validateObjArg(l_mainCurves[0]))                        
                     
@@ -1614,164 +1897,364 @@ def shapes_fromCast(self, targets = None, mode = 'default', aimVector = None, up
 
 
 
-
-
-
-
-def mesh_proxyCreate(self, targets = None, upVector = None, degree = 1,firstToStart=False, ballBase = True):
-    _short = self.mBlock.mNode
-    _str_func = 'mesh_proxyCreate'
-    log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
-    log.debug("{0}".format(self))
-    
-    mRigNull = self.mRigNull
-    ml_shapes = []
-    
-    if upVector is None:
-        upVector = self.d_orientation['mOrientation'].p_up.p_string
-    
-    #Get our prerig handles if none provided
-    if targets is None:
-        ml_targets = self.mRigNull.msgList_get('rigJoints',asMeta = True)
-        if not ml_targets:
-            raise ValueError,"No rigJoints connected. NO targets offered"
-    else:
-        ml_targets = cgmMeta.validateObjListArg(targets,'cgmObject')
-    
-
-    ml_handles = self.mBlock.msgList_get('templateHandles',asMeta = True)
-    #l_targets = [mObj.loftCurve.mNode for mObj in ml_handles]
-    #res_body = mc.loft(l_targets, o = True, d = 3, po = 0 )
-    #mMesh_tmp = cgmMeta.validateObjArg(res_body[0],'cgmObject')
-    #str_tmpMesh = mMesh_tmp.mNode
-    
-    mMesh_tmp =  self.mBlock.atUtils('get_castMesh')
-    str_meshShape = mMesh_tmp.getShapes()[0]    
-
-    
-    #Process ----------------------------------------------------------------------------------
-    l_newCurves = []
-    str_meshShape = mMesh_tmp.getShapes()[0]
-    log.debug("|{0}| >> Shape: {1}".format(_str_func,str_meshShape))
-    
-    minU = ATTR.get(str_meshShape,'minValueU')
-    maxU = ATTR.get(str_meshShape,'maxValueU')
-    
-    l_failSafes = MATH.get_splitValueList(minU,maxU,
-                                          len(ml_targets))
-    log.debug("|{0}| >> Failsafes: {1}".format(_str_func,l_failSafes))
-    
-    l_uIsos = SURF.get_dat(str_meshShape, uKnots=True)['uKnots']
-    log.debug("|{0}| >> Isoparms U: {1}".format(_str_func,l_uIsos))
-    
-    l_uValues = []
-    str_start = False
-    l_sets = []
-    #First loop through and get our base U Values for each point
-    for i,mTar in enumerate(ml_targets):
-        j = mTar.mNode
-        _d = RAYS.cast(str_meshShape,j,upVector)
-        log.debug("|{0}| >> Casting {1} ...".format(_str_func,j))
-        #cgmGEN.log_info_dict(_d,j)
-        if not _d:
-            log.debug("|{0}| >> Using failsafe value for: {1}".format(_str_func,j))
-            _v = l_failSafes[i]
-        else:
-            _v = _d['uvsRaw'][str_meshShape][0][0]
-        log.debug("|{0}| >> v: {1} ...".format(_str_func,_v))
+def joints_flipChainForBehavior(self,ml_chain=None):
+    d_children = {}
+    for mJoint in ml_chain:
+        ml_end_children = mJoint.getChildren(asMeta=True)
+        if ml_end_children:
+            d_children[mJoint] = ml_end_children
+            for mChild in ml_end_children:
+                mChild.parent = False        
+        mJoint.parent = False
         
-        l_uValues.append(_v)
-        
-    for i,v in enumerate(l_uValues):
-        _l = [v]
-        
-        for uKnot in l_uIsos:
-            if uKnot > v:
-                if v == l_uValues[-1]:
-                    if uKnot < maxU:
-                        _l.append(uKnot)
-                elif uKnot < l_uValues[i+1]:
-                    _l.append(uKnot)
+    
+    for mJoint in ml_chain:
+        ATTR.set(mJoint.mNode,"r{0}".format(self.d_orientation['str'][2]),180)
+    
+    for i,mJoint in enumerate(ml_chain[1:]):
+        mJoint.parent = ml_chain[i]
+
+    JOINTS.freezeJointOrientation(ml_chain)
+    
+    for i,mJoint in enumerate(ml_chain):
+        if d_children.get(mJoint):
+            for mChild in d_children[mJoint]:
+                mChild.parent = mJoint
                 
-        if v == l_uValues[-1]:
-            _l.append(maxU)
+def joints_mirrorChainAndConnect(self,ml_chain=None):
+    _str_func = 'joints_mirrorChainAndConnect'
+    mBlock = self.mBlock
+    mRigNull = self.mRigNull
+    ml_fkAttachJoints = mBlock.UTILS.skeleton_buildDuplicateChain(mBlock, ml_chain,
+                                                                  'fkAttach',mRigNull,'fkAttachJoints',
+                                                                  blockNames=False,cgmType = 'frame')
+
+    joints_flipChainForBehavior(self, ml_chain)
+    for i,mJoint in enumerate(ml_fkAttachJoints):
+        log.info("|{0}| >> Mirror connect: {1} | {2} ...".format(_str_func,i,mJoint))        
+        ml_chain[i].connectChildNode(ml_fkAttachJoints[i],"fkAttach","rootJoint")
+        #attributes.doConnectAttr(("%s.rotateOrder"%mJoint.mNode),("%s.rotateOrder"%ml_fkDriverJoints[i].mNode))
+        cgmMeta.cgmAttr(ml_chain[i].mNode,"rotateOrder").doConnectOut("%s.rotateOrder"%ml_fkAttachJoints[i].mNode)
+        mJoint.p_parent = ml_chain[i]
+        
+    return ml_fkAttachJoints
+
+
+def mesh_proxyCreate(self, targets = None, aimVector = None, degree = 1,firstToStart=False, 
+                     ballBase = True,
+                     ballMode = 'loft',
+                     ballPosition = 'joint',
+                     extendToStart = True,method = 'u'):
+    try:
+        _short = self.mBlock.mNode
+        _str_func = 'mesh_proxyCreate'
+        log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
+        log.debug("{0}".format(self))
+        
+        mRigNull = self.mRigNull
+        ml_shapes = []
+        
+        _offset = self.mBlock.atUtils('get_shapeOffset') or .25
+        _dir = self.d_module.get('direction')
+        if aimVector is None:
+            if _dir and _dir.lower() == 'left':
+                aimVector = self.d_orientation['mOrientation'].p_outNegative.p_string
+            else:
+                aimVector = self.d_orientation['mOrientation'].p_out.p_string
+                
+            
+        #Get our prerig handles if none provided
+        if targets is None:
+            ml_targets = self.mRigNull.msgList_get('rigJoints',asMeta = True)
+            if not ml_targets:
+                raise ValueError,"No rigJoints connected. NO targets offered"
         else:
-            _l.append(l_uValues[i+1])
-            
-        if i == 0:
-            _l.insert(0,minU)
-            
-        l_sets.append(_l)
-
+            ml_targets = cgmMeta.validateObjListArg(targets,'cgmObject')
         
-        #>>For each v value, make a new curve ---------------------------------------------------------
-        #duplicateCurve -ch 1 -rn 0 -local 0  "loftedSurface2.u[0.724977270271534]"
-        #l_uValues.append(_v)
-        #crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,_v), ch = 0, rn = 0, local = 0)
-        #log.debug("|{0}| >> created: {1} ...".format(_str_func,crv))        
-        #l_newCurves.append(crv[0])
-        #if mTar == ml_targets[-1]:
-        #    crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,maxU), ch = 0, rn = 0, local = 0)
-        #    l_newCurves.append(crv[0])
-            
-        #str_start = crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,0),
-        #                                    ch = 0, rn = 0, local = 0)[0]
-
-    l_newCurves = []
-    d_curves = {}
-    def getCurve(uValue,l_curves):
-        _crv = d_curves.get(uValue)
-        if _crv:return _crv
-        _crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,uValue), ch = 0, rn = 0, local = 0)[0]
-        d_curves[uValue] = _crv
-        log.debug("|{0}| >> created: {1} ...".format(_str_func,_crv))        
-        l_curves.append(_crv)
-        return _crv
+    
+        ml_handles = self.mBlock.msgList_get('templateHandles',asMeta = True)
+        #l_targets = [mObj.loftCurve.mNode for mObj in ml_handles]
+        #res_body = mc.loft(l_targets, o = True, d = 3, po = 0 )
+        #mMesh_tmp = cgmMeta.validateObjArg(res_body[0],'cgmObject')
+        #str_tmpMesh = mMesh_tmp.mNode
         
-    #>>Reloft those sets of curves and cap them ------------------------------------------------------------
-    log.debug("|{0}| >> Create new mesh objs.".format(_str_func))
-    l_new = []
-    for i,uSet in enumerate(l_sets):
-        log.debug("|{0}| >> {1} | u's: {2}".format(_str_func,i,uSet))
+        mMesh_tmp =  self.mBlock.atUtils('get_castMesh')
+        str_meshShape = mMesh_tmp.getShapes()[0]
+        
         """
-        if i == 0 and str_start:
-            _pair = [str_start,c,l_newCurves[i+1]]
+        if len(ml_targets)==1:
+            log.debug("|{0}| >> Single mode!".format(_str_func))
+            _res = mc.nurbsToPoly(mMesh_tmp.mNode, mnd=1, ch =0, f =1, pt= 1, pc= 200, chr= 0.9, ft= 0.01, mel= 0.001, d= 0.1, ut= 1, un= 3, vt= 1, vn= 3, uch= 0, ucr= 0, cht= 0.01, es= 0, ntr= 0, mrt= 0, uss= 1)
+
+            return _res[0]"""
+            
+    
+        
+        #Process ----------------------------------------------------------------------------------
+        l_newCurves = []
+        l_pos = []
+        str_meshShape = mMesh_tmp.getShapes()[0]
+        log.debug("|{0}| >> Shape: {1}".format(_str_func,str_meshShape))
+        """
+        minU = ATTR.get(str_meshShape,'minValueU')
+        maxU = ATTR.get(str_meshShape,'maxValueU')
+        
+        l_failSafes = MATH.get_splitValueList(minU,maxU,
+                                              len(ml_targets))
+        log.debug("|{0}| >> Failsafes: {1}".format(_str_func,l_failSafes))
+        
+        l_uIsos = SURF.get_dat(str_meshShape, uKnots=True)['uKnots']
+        log.debug("|{0}| >> Isoparms U: {1}".format(_str_func,l_uIsos))
+        """
+        _cap = method.capitalize()
+        minU = ATTR.get(str_meshShape,'minValue{0}'.format(_cap))
+        maxU = ATTR.get(str_meshShape,'maxValue{0}'.format(_cap))
+        
+        l_failSafes = MATH.get_splitValueList(minU,maxU,
+                                              len(ml_targets))
+        log.debug("|{0}| >> Failsafes: {1}".format(_str_func,l_failSafes))
+        
+        if method == 'u':
+            l_uIsos = SURF.get_dat(str_meshShape, uKnots=True)['uKnots']
         else:
-            _pair = [c,l_newCurves[i+1]]"""
+            l_uIsos = SURF.get_dat(str_meshShape, vKnots=True)['vKnots']
+            
+        log.debug("|{0}| >> Isoparms {2}: {1}".format(_str_func,l_uIsos,_cap))        
         
-        _loftCurves = [getCurve(uValue, l_newCurves) for uValue in uSet]
+        l_uValues = []
+        str_start = False
+        l_sets = []
+        #First loop through and get our base U Values for each point
+        for i,mTar in enumerate(ml_targets):
+            j = mTar.mNode
+            _d = RAYS.cast(str_meshShape,j,aimVector)
+            l_pos.append(mTar.p_position)
+            log.debug("|{0}| >> Casting {1} ...".format(_str_func,j))
+            #cgmGEN.log_info_dict(_d,j)
+            if not _d:
+                log.debug("|{0}| >> Using failsafe value for: {1}".format(_str_func,j))
+                _v = l_failSafes[i]
+            else:
+                if method == 'v':
+                    _v = _d['uvsRaw'][str_meshShape][0][1]
+                else:
+                    _v = _d['uvsRaw'][str_meshShape][0][0]
+                    
+                
+            log.debug("|{0}| >> v: {1} ...".format(_str_func,_v))
             
-        _mesh = create_loftMesh(_loftCurves, name="{0}_{1}".format('test',i), divisions=1)
-        RIGGING.match_transform(_mesh,ml_targets[i])
+            l_uValues.append(_v)
+            
+        _b_singleMode =False
+        if len(l_uValues) < 2:
+            l_uValues.append(maxU)
+            _b_singleMode = True
+            
+        for i,v in enumerate(l_uValues):
+            _l = [v]
+            
+            for uKnot in l_uIsos:
+                if uKnot > v:
+                    if v == l_uValues[-1]:
+                        if uKnot < maxU:
+                            _l.append(uKnot)
+                    elif uKnot < l_uValues[i+1]:
+                        _l.append(uKnot)
+                    
+            if v == l_uValues[-1]:
+                _l.append(maxU)
+            else:
+                _l.append(l_uValues[i+1])
+                
+            if i == 0 and extendToStart:
+                _l.insert(0,minU)
+                
+            l_sets.append(_l)
+    
+            
+            #>>For each v value, make a new curve ---------------------------------------------------------
+            #duplicateCurve -ch 1 -rn 0 -local 0  "loftedSurface2.u[0.724977270271534]"
+            #l_uValues.append(_v)
+            #crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,_v), ch = 0, rn = 0, local = 0)
+            #log.debug("|{0}| >> created: {1} ...".format(_str_func,crv))        
+            #l_newCurves.append(crv[0])
+            #if mTar == ml_targets[-1]:
+            #    crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,maxU), ch = 0, rn = 0, local = 0)
+            #    l_newCurves.append(crv[0])
+                
+            #str_start = crv = mc.duplicateCurve("{0}.u[{1}]".format(str_meshShape,0),
+            #                                    ch = 0, rn = 0, local = 0)[0]
+    
+        l_newCurves = []
+        d_curves = {}
+        def getCurve(uValue,l_curves):
+            _crv = d_curves.get(uValue)
+            if _crv:return _crv
+            _crv = mc.duplicateCurve("{0}.{2}[{1}]".format(str_meshShape,uValue,method), ch = 0, rn = 0, local = 0)[0]
+            d_curves[uValue] = _crv
+            log.debug("|{0}| >> created: {1} ...".format(_str_func,_crv))        
+            l_curves.append(_crv)
+            return _crv
         
-        if ballBase and i != 0:
-            RIGGING.match_transform(_loftCurves[0],ml_targets[i])
-            TRANS.pivots_recenter(_loftCurves[0])
+        _degree = 1
+        if self.mBlock.loftDegree:
+            _degree = 3
             
-            _bb_size = SNAPCALLS.get_axisBox_size(_loftCurves[0])
-            _size = [_bb_size[0],_bb_size[1],MATH.average(_bb_size)]
-            _size = [v*.8 for v in _size]
-            _sphere = mc.polySphere(axis = [1,0,0], radius = 1, subdivisionsX = 10, subdivisionsY = 10)
-            TRANS.scale_to_boundingBox(_sphere[0], _size)
+        #>>Reloft those sets of curves and cap them ------------------------------------------------------------
+        log.debug("|{0}| >> Create new mesh objs.".format(_str_func))
+        l_new = []
+        _len_targets = len(ml_targets)
+        for i,uSet in enumerate(l_sets):
+            if i  and _b_singleMode:
+                log.debug("|{0}| >> SINGLE MODE".format(_str_func))                
+                break
             
-            SNAP.go(_sphere[0],_loftCurves[0],pivot='bb')
-            #TRANS.orient_set(_sphere[0], ml_targets[i].p_orient)
-            SNAP.go(_sphere[0],ml_targets[i].mNode,False,True)
+            log.debug("|{0}| >> {1} | u's: {2}".format(_str_func,i,uSet))
+            """
+            if i == 0 and str_start:
+                _pair = [str_start,c,l_newCurves[i+1]]
+            else:
+                _pair = [c,l_newCurves[i+1]]"""
             
-            _mesh = mc.polyUnite([_mesh,_sphere[0]], ch=False )[0]
+            _loftCurves = [getCurve(uValue, l_newCurves) for uValue in uSet]
+            
+            _mesh = create_loftMesh(_loftCurves, name="{0}_{1}".format('test',i), degree=_degree,divisions=1)
+            log.debug("|{0}| >> mesh created...".format(_str_func))                            
+            CORERIG.match_transform(_mesh,ml_targets[i])
+            #mc.polyNormal(_mesh, normalMode = 0, userNormalMode=1,ch=0)
+            
+            if ballBase and i != 0:
+                log.debug("|{0}| >> ball started...".format(_str_func))
+                CORERIG.match_transform(_loftCurves[0],ml_targets[i])
+                TRANS.pivots_recenter(_loftCurves[0])
+                
+                
+                if ballMode == 'loft':
+                
+                    root = mc.duplicate(_loftCurves[0])[0]
+                    try:
+                        _planar = mc.planarSrf(_loftCurves[0],ch=0,d=3,ko=0,rn=0,po=0)[0]
+                        vecRaw = SURF.get_uvNormal(_planar,.5,.5)
+                        vec = [-v for v in vecRaw]
+                        p1 = mc.pointOnSurface(_planar,parameterU=.5,parameterV=.5,position=True)#l_pos[i]                    
+                    except Exception,err:
+                        vec = [1,1,1]
+                        p1 = l_pos[i]                    
+                        log.debug("|{0}| >> surf fail. Using last vector: {1}".format(_str_func,vec))                
+                        
+                        
+                    
+                    p2 = l_pos[i-1]
+                    pClose = DIST.get_closest_point(ml_targets[i].mNode, _loftCurves[0])[0]
+                    dClose = DIST.get_distance_between_points(p1,pClose)
+                    d2 = DIST.get_distance_between_points(p1,p2)
+                    
+                    
+                    #planarSrf -ch 1 -d 3 -ko 0 -tol 0.01 -rn 0 -po 0 "duplicatedCurve40";
+                    #vecRaw = mc.pointOnSurface(_planar,parameterU=.5,parameterV=.5,normalizedNormal=True)
+    
+                    
+                    #vec = _resClosest['normal']
+                    
+                    """
+                    if uSet == l_sets[-1]:
+                        vec = MATH.get_vector_of_two_points(p1,p2)                    
+                    else:
+                        vec = MATH.get_vector_of_two_points(p1,l_pos[i-1])"""                
+                        #vec = MATH.get_vector_of_two_points(l_pos[i+1],p1)
+                        
+                    #dMax = min([dClose,_offset*10])
+                    dMax = (mc.arclen(root)/3.14)/2
+                    
+                    #dMax = dClose * .5#_offset *10
+                    pSet1 = DIST.get_pos_by_vec_dist(p1,vec,dMax * .5)                
+                    pSet2 = DIST.get_pos_by_vec_dist(p1,vec,dMax * .8)
+                    pSet3 = DIST.get_pos_by_vec_dist(p1,vec,dMax)
+                    
+                    DIST.offsetShape_byVector(root,-_offset)
+                    mid1 = mc.duplicate(root)[0]
+                    ATTR.set(mid1,'scale',.9)
+                    mid2 = mc.duplicate(root)[0]
+                    ATTR.set(mid2,'scale',.65)                
+                    end = mc.duplicate(root)[0]
+                    ATTR.set(end,'scale',.1)
+                    
+                    #DIST.offsetShape_byVector(end,-_offset)
+                    
+    
+                        
+                    TRANS.position_set(mid1,pSet1)
+                    TRANS.position_set(mid2,pSet2)
+                    TRANS.position_set(end,pSet3)
+                    
+                    #now loft new mesh...
+                    _meshEnd = create_loftMesh([end,mid2,mid1,root], name="{0}_{1}".format('test',i), degree=1,divisions=1)
+                    
+                    _mesh = mc.polyUnite([_mesh,_meshEnd], ch=False )[0]
+                    mc.delete([end,mid1,mid2,root])
+                    try:mc.delete(_planar)
+                    except:pass
+                else:
+                
+                    #TRANS.orient_set(_sphere[0], ml_targets[i].p_orient)
+                    if ballPosition == 'joint':
+                        p2 = DIST.get_closest_point(ml_targets[i].mNode, _loftCurves[0])[0]
+                        p1 = ml_targets[i].p_position
+                        d1 = DIST.get_distance_between_points(p1,p2)
+                        
+                        try:p1_2 = ml_targets[i+1].p_position
+                        except:p1_2 = ml_targets[i-1].p_position
+                        
+                        d2 = DIST.get_distance_between_points(p1,p1_2)
+                        d2 = min([d1,d2])
+                        
+                        #d_offset = d1 - _offset
+                        #log.info("{0} : {1}".format(d1,d_offset))
+                        _sphere = mc.polySphere(axis = [0,0,1],
+                                                radius = d1*.5,
+                                                subdivisionsX = 10,
+                                                subdivisionsY = 10)
+                        #_sphere = mc.polyCylinder(axis = [0,0,1],
+                        #                          radius = d1,
+                        #                          height = d2,
+                        #                          subdivisionsX = 1,
+                        #                          subdivisionsY = 1)                    
+                        #TRANS.scale_to_boundingBox(_sphere[0], [d1*1.75,d1*1.75,d2])
+                        
+                        SNAP.go(_sphere[0],ml_targets[i].mNode,True,True)
+                        
+                    else:
+                        _sphere = mc.polySphere(axis = [1,0,0], radius = 1, subdivisionsX = 10, subdivisionsY = 10)                    
+                        _bb_size = SNAPCALLS.get_axisBox_size(_loftCurves[0])
+                        _size = [_bb_size[0],_bb_size[1],MATH.average(_bb_size)]
+                        _size = [v*.8 for v in _size]
+                        SNAP.go(_sphere[0],_loftCurves[0],pivot='bb')
+                        TRANS.scale_to_boundingBox(_sphere[0], _size)
+                        SNAP.go(_sphere[0],ml_targets[i].mNode,False,True)
+            #_mesh = mc.polyUnite([_mesh,_sphere[0]], ch=False )[0]
             #mc.polyNormal(_mesh,setUserNormal = True)
-        RIGGING.match_transform(_mesh,ml_targets[i])
+                
+            CORERIG.match_transform(_mesh,ml_targets[i])
+            l_new.append(_mesh)
+            log.debug("|{0}| >> ball done...".format(_str_func))                
         
-        l_new.append(_mesh)
-    
-    #...clean up 
-    mc.delete(l_newCurves)# + [str_tmpMesh]
-    mMesh_tmp.delete()
-    
-    if str_start:
-        mc.delete(str_start)
-    #>>Parent to the joints ----------------------------------------------------------------- 
-    return l_new
+        #...clean up 
+        mc.delete(l_newCurves)# + [str_tmpMesh]
+        mMesh_tmp.delete()
+        
+        if str_start:
+            mc.delete(str_start)
+        #>>Parent to the joints ----------------------------------------------------------------- 
+        return l_new
+    except Exception,err:
+        cgmGEN.cgmException(Exception,err,msg=vars())
+
+
+
+
+
+
+
 
 
 def joints_connectToParent(self):

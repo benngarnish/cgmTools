@@ -111,7 +111,8 @@ def reset(node, attrs = None, amount = None):
             except Exception,err:
                 log.error("{0}.{1} resetAttrs | error: {2}".format(node, attr,err))   	
         return _reset
-    except Exception,err:cgmGeneral.cgmExceptCB(Exception,err,localDat=vars())
+    except Exception,err:
+        cgmGEN.cgmException(Exception,err,msg=vars())
 
     
         
@@ -396,42 +397,44 @@ def get(*a, **kws):
     :returns
         value(s)
     """ 
-    _str_func = 'get'
-    _d = validate_arg(*a) 
-    _combined = _d['combined']
-    _obj = _d['obj']
-    _attr = _d['attr']
+    try:
+        _str_func = 'get'
+        _d = validate_arg(*a) 
+        _combined = _d['combined']
+        _obj = _d['obj']
+        _attr = _d['attr']
+        
+        if kws:
+            if not kws.get('sl') or not kws.get('silent'):
+                kws['sl'] = True
     
-    if kws:
-        if not kws.get('sl') or not kws.get('silent'):
-            kws['sl'] = True
-
-    log.debug("|{0}| >> arg: {1}".format(_str_func,a))    
-    if kws:log.debug("|{0}| >> kws: {1}".format(_str_func,kws))
-
-    if "[" in _attr:
-        log.debug("Indexed attr")
-        return mc.listConnections(_combined)
-
-    try:attrType = mc.getAttr(_d['combined'],type=True)
-    except:
-        log.debug("|{0}| >> {1} failed to return type. Exists: {2}".format(_str_func,_d['combined'],mc.objExists(_d['combined'])))            
-        return None
+        log.debug("|{0}| >> arg: {1}".format(_str_func,a))    
+        if kws:log.debug("|{0}| >> kws: {1}".format(_str_func,kws))
     
-    if attrType in ['TdataCompound']:
-        return mc.listConnections(_combined)		
-
-    if mc.attributeQuery (_attr,node=_obj,msg=True):
-        #return mc.listConnections(_combined) or False 
-        return get_message(_d)
-    elif attrType == 'double3':
-        return [mc.getAttr(_obj+'.'+ a) for a in mc.attributeQuery(_attr, node = _obj, listChildren = True)]
-    #elif attrType == 'double':
-        #parentAttr = mc.attributeQuery(_attr, node =_obj, listParent = True)
-        #return mc.getAttr("{0}.{1}".format(_obj,parentAttr[0]), **kws)
-    else:
-        return mc.getAttr(_combined, **kws)
-
+        if "[" in _attr:
+            log.debug("Indexed attr")
+            return mc.listConnections(_combined)
+    
+        try:attrType = mc.getAttr(_d['combined'],type=True)
+        except:
+            log.debug("|{0}| >> {1} failed to return type. Exists: {2}".format(_str_func,_d['combined'],mc.objExists(_d['combined'])))            
+            return None
+        
+        if attrType in ['TdataCompound']:
+            return mc.listConnections(_combined)		
+    
+        if mc.attributeQuery (_attr,node=_obj,msg=True):
+            #return mc.listConnections(_combined) or False 
+            return get_message(_d)
+        elif attrType == 'double3':
+            return [mc.getAttr(_obj+'.'+ a) for a in mc.attributeQuery(_attr, node = _obj, listChildren = True)]
+        #elif attrType == 'double':
+            #parentAttr = mc.attributeQuery(_attr, node =_obj, listParent = True)
+            #return mc.getAttr("{0}.{1}".format(_obj,parentAttr[0]), **kws)
+        else:
+            return mc.getAttr(_combined, **kws)
+    except Exception,err:
+        cgmGeneral.cgmException(Exception,err)
 def set_keyframe(node, attr = None, value = None, time = None):
     """   
     Replacement for simple setKeyframe call. Necessary because Maya's doesn't allow multi attrs like translate,scale,rotate...
@@ -2125,6 +2128,7 @@ def get_message(messageHolder, messageAttr = None, dataAttr = None, dataKey = No
         if _msgBuffer and len(_msgBuffer) == 1:
             _msgBuffer = [_msgBuffer[0].split('.')[0]]
         else:
+            return False
             raise ValueError,"not sure what to do with this: {0}".format(_msgBuffer)
     else:
         _msgBuffer = mc.listConnections(_combined,destination=True,source=True,shapes=True)
@@ -2437,7 +2441,7 @@ def convert_type(node = None, attr = None, attrType = None):
     if _typeCurrent == 'message':
         _data = get_message(_d)
     elif _typeCurrent == 'enum':
-        _data = get_enum(_d)
+        _data = get_enumValueString(_d)
     else:
         _data = get(_d)
           
@@ -3292,7 +3296,7 @@ def store_info(node = None, attr = None, data = None, attrType = None, lock = Tr
     
         
         if attrType is None:
-            if mc.objExists(_data[0]):
+            if mc.objExists(_data[0]) and _data[0] not in ['front','top','side','perp']:
                 attrType = 'message'
             elif len(_data)==3:
                 attrType = 'double3'

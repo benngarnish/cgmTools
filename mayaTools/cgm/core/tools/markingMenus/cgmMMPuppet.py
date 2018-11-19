@@ -30,6 +30,8 @@ import maya.mel as mel
 from cgm.core import cgm_Meta as cgmMeta
 from cgm.core import cgm_RigMeta as cgmRigMeta
 #from cgm.core import cgm_PuppetMeta as cgmPM
+import cgm.core.mrs.Animate as MRSANIMATE
+reload(MRSANIMATE)
 from cgm.core.cgmPy import validateArgs as VALID
 from cgm.core import cgm_General as cgmGen
 from cgm.core.lib import snap_utils as SNAP
@@ -38,6 +40,8 @@ from cgm.core.lib import attribute_utils as ATTR
 from cgm.core.lib import name_utils as NAMES
 from cgm.core.lib import search_utils as SEARCH
 from cgm.core.lib import rigging_utils as RIGGING
+import cgm.core.rig.general_utils as RIGGEN
+reload(RIGGEN)
 import cgm.core.classes.GuiFactory as cgmUI
 from cgm.core.lib import list_utils as LISTS
 import cgm.core.tools.lib.tool_calls as TOOLCALLS
@@ -75,7 +79,7 @@ def bUI_radial(self,parent):
     mc.menuItem(parent = parent,
                 en = self._b_sel,
                 l = 'Mirror Selected (WIP)',
-                c = cgmGen.Callback(MMCONTEXT.func_process, RIGGING.mirror, self._l_sel,'each','mirror',True,**{}),                                                                                      
+                c = cgmGen.Callback(MRSANIMATE.uiMMFunc_test,self),
                 rp = 'SW',
                 ) 
     
@@ -108,10 +112,11 @@ def bUI_lower(self,parent):
     _optionVar_val_puppetOn = self.var_PuppetMMBuildPuppet.value  
     
     #Change space menu
-    DYNPARENTTOOL.uiMenu_changeSpace(self,parent,False)                 
+    DYNPARENTTOOL.uiMenu_changeSpace(self,parent,False)
     
     timeStart_objectList = time.clock() 
     
+    return
     #>>  Individual objects....  ============================================================================
     if self._ml_objList:
         self._d_mObjInfo = {}

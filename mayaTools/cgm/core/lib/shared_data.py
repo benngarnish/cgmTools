@@ -6,9 +6,10 @@ email: jjburton@cgmonks.com
 Website : http://www.cgmonks.com
 ------------------------------------------
 """
-l_cgmNameOrder = ['cgmPosition',
+l_cgmNameOrder = ['cgmDirection',
                   'cgmDirectionModifier',
-                  'cgmDirection',
+                  'cgmPosition',
+                  'cgmPositionModifer',
                   'cgmName',
                   'cgmNameModifier',
                   'cgmIterator',
@@ -33,8 +34,11 @@ d_shortNames = {'module':'part',
                 'right':'R' ,
                 'center':'CTR',
                 'front':'FRNT',
+                'upper':'UPR',
+                'lower':'LWR',
                 'back':'BCK',
-                'top':'TP',
+                'top':'TOP',
+                'rear':'REAR',
                 'bottom':'BTM',
                 'blendShape':'bs',
                 'quickSelectSet':'qss',
@@ -70,11 +74,10 @@ d_shortNames = {'module':'part',
 
 d_cgmTypes = {### Custom Types
               'null':'null',
-              'group':'grp',
               'object':'obj',
               'skinCluster':'skinNode',
               'blendShapeGeo':'bsGeo',
-              
+              'group':'grp',
               ### Controls
               'controlMaster':'placer',
               'controlAnim':'anim',
@@ -85,8 +88,7 @@ d_cgmTypes = {### Custom Types
               
               ### Maya Types
               'camera':'cam',
-              'transform':'grp',
-              'group':'grp',
+              'transform':'group',
               'locator':'loc',
               
               
@@ -337,3 +339,8 @@ objectSetTypes = {'animation':'animSet',
                   'td':'tdSet',
                   'fx':'fxSet',
                   'lighting':'lightingSet'}
+
+
+#>>>Option vars
+#=================================================================
+l_resetModes = 'all','transforms','keyable'

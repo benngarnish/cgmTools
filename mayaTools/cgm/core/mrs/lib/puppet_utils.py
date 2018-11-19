@@ -25,7 +25,7 @@ from Red9.core import Red9_AnimationUtils as r9Anim
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 #========================================================================
 
 import maya.cmds as mc
@@ -34,7 +34,8 @@ import maya.cmds as mc
 from cgm.core import cgm_General as cgmGEN
 from cgm.core import cgm_Meta as cgmMeta
 from cgm.core import cgm_RigMeta as RIGMETA
-
+import cgm.core.rig.constraint_utils as RIGCONSTRAINT
+reload(RIGCONSTRAINT)
 from cgm.core.lib import curve_Utils as CURVES
 from cgm.core.lib import attribute_utils as ATTR
 from cgm.core.lib import position_utils as POS
@@ -47,6 +48,8 @@ from cgm.core.lib import search_utils as SEARCH
 from cgm.core.lib import rayCaster as RAYS
 from cgm.core.cgmPy import validateArgs as VALID
 from cgm.core.cgmPy import path_Utils as PATH
+import cgm.core.rig.general_utils as RIGGEN
+
 import cgm.core.rig.joint_utils as COREJOINTS
 import cgm.core.lib.transform_utils as TRANS
 import cgm.core.lib.ml_tools.ml_resetChannels as ml_resetChannels
@@ -54,7 +57,6 @@ import cgm.core.lib.ml_tools.ml_resetChannels as ml_resetChannels
 #=============================================================================================================
 #>> Queries
 #=============================================================================================================
-
 def example(self):
     try:
         _short = self.p_nameShort
@@ -155,7 +157,7 @@ def module_connect(self,mModule,**kws):
     
         if mModule.getMessage('moduleMirror'):
             log.debug("|{0}| >> moduleMirror found. connecting...".format(_str_func))
-            module_connect(self,mi_module.moduleMirror)        
+            #module_connect(self,mModule.moduleMirror)        
     
         return True        
        
@@ -171,14 +173,13 @@ def is_upToDate(self,report = True):
         print("|{0}| >> ".format(_short) + cgmGEN._str_subLine)
     
     for mModule in modules_get(self):
-        #mModule.UTILS.is_upToDate(mModule,report)
         _res.append( mModule.atUtils('is_upToDate',report) )
         
     if report:
-        if _res:
+        if False in _res:
             print("|{0}| >> OUT OF DATE ".format(_short))
         else:
-            print("|{0}| >> build current. ".format(_short))
+            log.info("|{0}| >> build current. ".format(_short))
         print cgmGEN._str_hardBreak
         
     if False in _res:
@@ -208,7 +209,9 @@ def mirror_verify(self):
     int_lenModules = len(ml_modules)
     
     for i,mModule in enumerate(ml_modules):
-        mModule.UTILS.mirror_verifySetup(mModule,d_runningSideIdxes, ml_processed)
+        try:mModule.UTILS.mirror_verifySetup(mModule,d_runningSideIdxes, ml_processed)
+        except Exception,err:
+            log.error(err)
     
     
     return
@@ -500,7 +503,8 @@ def anim_reset(self,transformsOnly = True):
         
         self.puppetSet.select()
         if mc.ls(sl=True):
-            ml_resetChannels.main(transformsOnly = transformsOnly)
+            RIGGEN.reset_channels(transformsOnly = transformsOnly)
+            #ml_resetChannels.main(transformsOnly = transformsOnly)
             _result = True
         if _sel:mc.select(_sel)
         return _result
@@ -541,14 +545,364 @@ def layer_verify(self,**kws):
         log.debug("|{0}| >> ... [{1}]".format(_str_func,self)+ '-'*80)
         
         if not self.getMessage('displayLayer'):
-            self.masterNull.select()
             mLayer = cgmMeta.validateObjArg(mc.createDisplayLayer(),'cgmNode',setClass=True)
             
             ATTR.copy_to(self.mNode,'cgmName',mLayer.mNode,driven='target')
-            #mLayer.doStore('cgmType')
+            mLayer.doStore('cgmName','main')
             mLayer.doName()
-            
             self.connectChildNode(mLayer.mNode,'displayLayer')
-            return mLayer
-        return self.displayLayer
+            
+        if not self.getMessage('controlLayer'):
+            mLayer = cgmMeta.validateObjArg(mc.createDisplayLayer(),'cgmNode',setClass=True)
+            
+            #ATTR.copy_to(self.mNode,'cgmName',mLayer.mNode,driven='target')
+            mLayer.doStore('cgmName','control')
+            mLayer.doName()
+            self.connectChildNode(mLayer.mNode,'controlLayer')
+        
+        return self.displayLayer, self.controlLayer
     except Exception,err:cgmGEN.cgmException(Exception,err)
+    
+    
+def armature_verify(self):
+    """
+    First pass on armature setup
+    """
+    _str_func = 'verify_armature'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    
+    if not self.getMessage('armature'):
+        log.debug("|{0}| >> missing plug. Creating armature dag...".format(_str_func))
+        mArmature = self.masterNull.doCreateAt(setClass=True)
+    else:
+        mArmature = self.getMessageAsMeta('armature')
+        
+    ATTR.copy_to(self.mNode,'cgmName',mArmature.mNode,driven='target')
+    mArmature.addAttr('puppet',attrType = 'messageSimple')
+    if not mArmature.connectParentNode(self.mNode,'puppet','armature'):
+        raise StandardError,"Failed to connect masterNull to puppet network!"
+
+    mArmature.addAttr('cgmType',initialValue = 'ignore',lock=True)
+    mArmature.addAttr('cgmModuleType',value = 'master',lock=True)   
+    mArmature.addAttr('geoGroup',attrType = 'messageSimple',lock=True)
+    mArmature.addAttr('skeletonGroup',attrType = 'messageSimple',lock=True) 
+
+    #See if it's named properly. Need to loop back after scene stuff is querying properly
+    mArmature.doName()
+    mArmature.dagLock(True,ignore='v')
+    
+    mc.editDisplayLayerMembers(self.displayLayer.mNode, mArmature.mNode, noRecurse=True)
+    #editDisplayLayerMembers -noRecurse master_displayLayer `ls -selection`;
+    
+    for attr in 'geo','skeleton':
+        _plug = attr+'Group'
+        
+        if mArmature.getMessage(_plug):
+            mGroup = mArmature.getMessageAsMeta(_plug)
+            if mGroup.getParent(asMeta=1) != mArmature:
+                mGroup.dagLock(False)
+                mGroup.p_parent = mArmature
+                mGroup.dagLock(True)
+            continue
+        
+        if not self.masterNull.getMessage(_plug):
+            log.debug("|{0}| >> missing plug. Creating: {1}".format(_str_func,attr))            
+            mGroup = self.masterNull.doCreateAt(setClass=True)    
+            self.masterNull.connectChildNode(mGroup,_plug,'module')
+        else:
+            mGroup = self.masterNull.getMessageAsMeta(_plug)
+            mGroup.dagLock(False)        
+        
+            
+        mArmature.connectChildNode(mGroup,_plug)
+        mGroup.p_parent = mArmature
+        mGroup.dagLock(True)
+        mGroup.rename(attr)        
+
+        log.debug("|{0}| >> attr: {1} | mGroup: {2}".format(_str_func, attr, mGroup))    
+    return
+
+def armature_remove(self):
+    """
+    Remove the armature
+    """
+    _str_func = 'armature_remove'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    
+    if not self.getMessage('armature'):
+        return log.error("|{0}| >> No armature found.".format(_str_func))
+    
+    mArmature = self.getMessageAsMeta('armature')
+        
+    for attr in 'geo','skeleton':
+        _plug = attr+'Group'
+        
+        if mArmature.getMessage(_plug):
+            mGroup = mArmature.getMessageAsMeta(_plug)
+            log.debug("|{0}| >> attr: {1} | mGroup: {2}".format(_str_func, attr, mGroup))                
+            mGroup.dagLock(False)
+            if attr == 'geo':
+                mGroup.p_parent = self.masterNull.noTransformGroup
+            else:
+                mGroup.p_parent = self.masterControl
+            mGroup.rename("{0}_grp".format(attr))
+            mGroup.dagLock(True)
+            
+        else:
+            log.error("|{0}| >> Missing group: {1}.".format(_str_func,attr))
+    return
+
+
+def is_rigged(self):
+    _str_func = 'is_rigged'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    if not self.getMessage('masterControl'):
+        return False
+    
+    return True
+    
+    
+def rig_connect(self):
+    """
+    First pass on armature setup
+    """
+    _str_func = 'rig_connect'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    if not is_rigged(self) and force !=True:
+        log.debug("|{0}| >>  Module not rigged".format(_str_func))
+        return False
+
+    if rig_isConnected(self):
+        log.debug("|{0}| >>  Master control already connected".format(_str_func))
+        return True    
+    
+    mRootJoint = self.getMessageAsMeta('rootJoint')
+    if not mRootJoint:
+        log.warning("|{0}| >> No root joint".format(_str_func))        
+        return 
+    
+    mRootMotionHandle =  self.getMessageAsMeta('rootMotionHandle')
+    if not mRootJoint:
+        log.error("|{0}| >> No root motion handle".format(_str_func))        
+        raise Exception,"No root motion handle found. "
+    
+    RIGCONSTRAINT.driven_connect(mRootJoint,mRootMotionHandle)
+    
+    return True
+    
+    
+def rig_disconnect(self):
+    """
+    First pass on armature setup
+    """
+    _str_func = 'rig_disconnect'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    if not rig_isConnected(self):
+        log.debug("|{0}| >>  Master control not connected".format(_str_func))
+        return True
+    
+    mRootJoint = self.getMessageAsMeta('rootJoint')
+    if not mRootJoint:
+        log.warning("|{0}| >> No root joint".format(_str_func))        
+        return
+    
+    RIGCONSTRAINT.driven_disconnect(mRootJoint)
+    return True
+    
+    
+    
+    
+def rig_isConnected(self):
+    """
+    First pass on armature setup
+    """
+    _str_func = 'rig_isConnected'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    mRootJoint = self.getMessageAsMeta('rootJoint')
+    if not mRootJoint:
+        return False
+    
+    if mRootJoint.getConstraintsTo():
+        return True
+    return False
+
+    
+    
+def qss_verify(self,puppetSet=True,bakeSet=True,deleteSet=False):
+    """
+    First pass on qss verification
+    """
+    _str_func = 'qss_verify'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    
+    if puppetSet:
+        log.debug("|{0}| >> puppetSet...".format(_str_func)+'-'*40)        
+        
+        mSet = self.getMessageAsMeta('puppetSet')
+        if not mSet:
+            mSet = cgmMeta.cgmObjectSet(setType='animSet',qssState=True)
+            mSet.connectParentNode(self.mNode,'puppet','puppetSet')
+            #ATTR.copy_to(self.mNode,'cgmName',mSet.mNode,'cgmName',driven = 'target')
+            mSet.doStore('cgmName','all')
+            
+        mSet.doName()
+        
+        log.debug("|{0}| >> puppetSet: {1}".format(_str_func,mSet))
+        
+    if bakeSet:
+        log.debug("|{0}| >> bakeset...".format(_str_func)+'-'*40)        
+        
+        mSet = self.getMessageAsMeta('bakeSet')
+        if not mSet:
+            mSet = cgmMeta.cgmObjectSet(setType='tdSet',qssState=True)
+            mSet.connectParentNode(self.mNode,'puppet','bakeSet')
+            #ATTR.copy_to(self.mNode,'cgmName',mSet.mNode,'cgmName',driven = 'target')
+            mSet.doStore('cgmName','bake')
+            #mSet.doStore('cgmTypeModifier','bake')
+        mSet.doName()
+        mSet.purge()
+        log.debug("|{0}| >> bakeSet: {1}".format(_str_func,mSet))
+        
+        ml_joints = get_joints(self,'bind')
+        
+        for mObj in ml_joints:
+            log.debug("|{0}| >>adding : {1}".format(_str_func,mObj))            
+            mSet.addObj(mObj.mNode)
+        
+    if deleteSet:
+        log.debug("|{0}| >> deleteSet...".format(_str_func)+'-'*40)        
+        
+        mSet = self.getMessageAsMeta('deleteSet')
+        if not mSet:
+            mSet = cgmMeta.cgmObjectSet(setType='tdSet',qssState=True)
+            mSet.connectParentNode(self.mNode,'puppet','deleteSet')
+            #ATTR.copy_to(self.mNode,'cgmName',mSet.mNode,'cgmName',driven = 'target')
+            #mSet.doStore('cgmTypeModifier','bake')
+            mSet.doStore('cgmName','delete')
+        mSet.doName()
+        mSet.purge()
+
+        log.debug("|{0}| >> deleteSet: {1}".format(_str_func,mSet))
+        
+        for mObj in get_deleteSetDat(self):
+            mSet.addObj(mObj.mNode)
+        
+def groups_verify(self):
+    try:
+        _str_func = "groups_verify".format()
+        log.debug("|{0}| >> ...".format(_str_func))
+    
+        mMasterNull = self.masterNull
+    
+        if not mMasterNull:
+            raise ValueError, "No masterNull"
+    
+        for attr in ['rig','deform','noTransform','geo','skeleton',
+                     'parts','worldSpaceObjects','puppetSpaceObjects']:
+            _link = attr+'Group'
+            mGroup = mMasterNull.getMessage(_link,asMeta=True)# Find the group
+            if mGroup:mGroup = mGroup[0]
+    
+            if not mGroup:
+                mGroup = mMasterNull.doCreateAt(setClass=True)
+                mGroup.connectParentNode(mMasterNull.mNode,'puppet', attr+'Group')
+                
+            mGroup.rename(attr)
+            log.debug("|{0}| >> attr: {1} | mGroup: {2}".format(_str_func, attr, mGroup))
+    
+            # Few Case things
+            #----------------------------------------------------
+            if attr in ['rig','geo','skeleton']:
+                mGroup.p_parent = mMasterNull
+            elif attr in ['deform','puppetSpaceObjects'] and self.getMessage('masterControl'):
+                mGroup.p_parent = self.getMessage('masterControl')[0]	    
+            else:    
+                mGroup.p_parent = mMasterNull.rigGroup
+    
+            ATTR.set_standardFlags(mGroup.mNode)
+    
+            if attr == 'worldSpaceObjects':
+                mGroup.addAttr('cgmAlias','world')
+            elif attr == 'puppetSpaceObjects':
+                mGroup.addAttr('cgmAlias','puppet')
+                
+    except Exception,err:cgmGEN.cgmException(Exception,err)
+
+def collect_worldSpaceObjects(self):
+    _str_func = 'collect_worldSpaceObjects'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)    
+    ml_objs = []
+    mMasterNull = self.masterNull
+    mWorldSpaceObjectsGroup = mMasterNull.worldSpaceObjectsGroup
+    mPuppetSpaceObjectsGroup = mMasterNull.puppetSpaceObjectsGroup
+    
+    for mObj in self.masterControl.getChildren(asMeta = 1):
+        if mObj.getMayaAttr('cgmType') in ['dynDriver']:
+            mObj.parent = mPuppetSpaceObjectsGroup
+            ml_objs.append(mObj)
+    for mObj in mMasterNull.getChildren(asMeta = 1):
+        if mObj.getMayaAttr('cgmType') in ['dynDriver']:
+            mObj.parent = mWorldSpaceObjectsGroup     
+            ml_objs.append(mObj)
+            
+    return ml_objs
+
+def get_joints(self,mode='bind'):
+    """
+    First pass on qss verification
+    """
+    _str_func = 'get_joints'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    _mode = mode.lower()
+    _res = []
+    if _mode in ['bind','skin']:
+        mRoot = self.getMessageAsMeta('rootJoint')
+        if mRoot:
+            _res.append(mRoot)
+    for mModule in modules_get(self):
+        if _mode in ['bind','skin']:
+            ml = mModule.UTILS.rig_getSkinJoints(mModule,asMeta=True)
+        elif _mode in ['rig']:
+            ml = mModule.rigNull.msgList_get('rigJoints',asMeta = True)
+        else:
+            raise ValueError,"Unknown mode: {0}".format(mode)
+        _res.extend(ml)
+        
+    return _res
+        
+
+def get_deleteSetDat(self):
+    """
+    First pass on qss verification
+    """
+    _str_func = 'get_deleteSetDat'
+    log.debug("|{0}| >> ...".format(_str_func)+cgmGEN._str_hardBreak)
+    log.debug(self)
+    mMasterNull = self.masterNull
+    l_compare = [mMasterNull.geoGroup,mMasterNull.skeletonGroup]
+    _res = []
+    for mChild in mMasterNull.getChildren(asMeta=True):
+        if mChild not in l_compare:
+            _res.append(mChild)
+    
+    
+    return _res
+    
+
+    
+    

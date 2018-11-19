@@ -23,7 +23,7 @@ from Red9.core import Red9_Meta as r9Meta
 from Red9.core import Red9_AnimationUtils as r9Anim
 
 # From cgm ==============================================================
-from cgm.core import cgm_General as cgmGen
+from cgm.core import cgm_General as cgmGEN
 from cgm.core.cgmPy import validateArgs as VALID
 
 from cgm.lib import search
@@ -295,7 +295,7 @@ def combineShapes(targets = [], keepSource = True, replaceShapes = False, snapFi
             shapeParent_in_place(targets[-1],o,keepSource,replaceShapes,snapFirst)
         return targets[-1]
     except Exception,err:
-        cgmGen.cgmExceptCB(Exception,err,localDat=vars())
+        cgmGEN.cgmException(Exception,err,msg=vars())
 
 def shapeParent_in_place(obj, shapeSource, keepSource = True, replaceShapes = False, snapFirst = False):
     """
@@ -417,7 +417,7 @@ def shapeParent_in_place(obj, shapeSource, keepSource = True, replaceShapes = Fa
             if not keepSource:
                 mc.delete(c)
         except Exception,err:
-            cgmGen.cgmExceptCB(Exception,err,localDat=vars())
+            cgmGEN.cgmException(Exception,err,msg=vars())
     return True
 
 def create_axisProxy(obj=None):
@@ -479,14 +479,14 @@ def create_axisProxy(obj=None):
         
         #SNAP.go(_proxy,_dag,pivot='bb')
 
-        #cgmGen.func_snapShot(vars())
+        #cgmGEN.func_snapShot(vars())
         
         _proxy = TRANS.parent_set(_proxy, False)
         mc.delete(_dup)
         #match_transform(_proxy,_dag)
         return mc.rename(_proxy, "{0}_localAxisProxy".format(NAMES.get_base(_dag)))
     except Exception,err:
-        cgmGen.cgmExceptCB(Exception,err)
+        cgmGEN.cgmException(Exception,err,msg=vars())
     
 def create_localAxisProxyBAK(obj=None):
     """
@@ -537,7 +537,7 @@ def create_localAxisProxyBAK(obj=None):
         #import cgm.core.lib.math_utils as COREMATH
         #TRANS.scaleLocal_set(_dup, COREMATH.list_mult([-1.0,-1.0,-1.0],_scaleLossy,))
         #proxy = TRANS.parent_set(_proxy, False)
-        cgmGen.func_snapShot(vars())
+        cgmGEN.func_snapShot(vars())
         
         #ATTR.set(_dup,'translate',t)
         #ATTR.set(_dup,'rotate',r)
@@ -552,7 +552,8 @@ def create_localAxisProxyBAK(obj=None):
         #ATTR.set(_dup,'scale',s)
 
         return mc.rename(_proxy, "{0}_localAxisProxy".format(NAMES.get_base(_dag)))
-    except Exception,err:cgmGen.cgmExceptCB(Exception,err,localDat=vars())
+    except Exception,err:
+        cgmGEN.cgmException(Exception,err,msg=vars())
     
         
 _d_proxyCreate = {'cube':'nurbsCube',
@@ -613,7 +614,7 @@ def create_proxyGeo(proxyShape = 'cube', size = [1,1,1], direction = 'z+',ch=Tru
         
         return _res
     except Exception,err:
-        cgmGen.cgmExceptCB(Exception,err,localDat=vars())
+        cgmGEN.cgmException(Exception,err,msg=vars())
     
 def create_at(obj = None, create = 'null',midPoint = False, l_pos = [], baseName = 'created'):
     """
@@ -665,7 +666,7 @@ def create_at(obj = None, create = 'null',midPoint = False, l_pos = [], baseName
         if objRotAxis:
             mc.xform(_created, ws=True, ra= objRotAxis,p=False)
         
-    elif _create in ['curve','curveLinear','linearTrack']:
+    elif _create in ['curve','curveLinear','linearTrack','cubicTrack']:
         if not l_pos:
             l_pos = []
             #_sel = mc.ls(sl=True,flatten=True)
@@ -676,7 +677,10 @@ def create_at(obj = None, create = 'null',midPoint = False, l_pos = [], baseName
         
         if len(l_pos) <= 1:
             raise ValueError,"Must have more than one position to create curve"
-        if _create == 'linearTrack':
+        if _create in ['linearTrack','cubicTrack']:
+            _d = 1
+            if _create == 'cubicTrack':
+                _d = 3
             _trackCurve = mc.curve(d=1,p=l_pos)
             _trackCurve = mc.rename(_trackCurve,"{0}_trackCurve".format(baseName))
     
@@ -685,9 +689,12 @@ def create_at(obj = None, create = 'null',midPoint = False, l_pos = [], baseName
             for i,cv in enumerate(mc.ls(['{0}.cv[*]'.format(_trackCurve)],flatten=True)):
                 _res = mc.cluster(cv, n = '{0}_{1}_cluster'.format(baseName,i))
                 TRANS.parent_set( _res[1], obj[i])
+                ATTR.set(_res[1],'visibility',0)
                 l_clusters.append(_res)
+                ATTR.set(_res[1],'visibility',False)
                 
             return _trackCurve,l_clusters
+            
                 
                 
         elif _create == 'curve':
@@ -873,7 +880,7 @@ def override_color(target = None, key = None, index = None, rgb = None, pushToSh
         
         _b_RBGMode = False
         _b_2016Plus = False
-        if cgmGen.__mayaVersion__ >=2016:
+        if cgmGEN.__mayaVersion__ >=2016:
             _b_2016Plus = True
             
         if key is not None:
@@ -893,7 +900,7 @@ def override_color(target = None, key = None, index = None, rgb = None, pushToSh
                     
         if rgb is not None:
             if not _b_2016Plus:
-                raise ValueError,"|{0}|  >> RGB values introduced in maya 2016. Current version: {1}".format(_str_func,cgmGen.__mayaVersion__) 
+                raise ValueError,"|{0}|  >> RGB values introduced in maya 2016. Current version: {1}".format(_str_func,cgmGEN.__mayaVersion__) 
             
             _b_RBGMode = True        
             if len(rgb) == 3:
@@ -1011,10 +1018,10 @@ def getControlShader(direction = 'center', controlType = 'main',
             ATTR.set(_node,'colorB',_rgb[2])
             
             if transparent:
-                ATTR.set(_node,'ambientColorR',_rgb[0])
-                ATTR.set(_node,'ambientColorG',_rgb[1])
-                ATTR.set(_node,'ambientColorB',_rgb[2])        
-                ATTR.set(_node,'transparency',.9)
+                ATTR.set(_node,'ambientColorR',_rgb[0]*.1)
+                ATTR.set(_node,'ambientColorG',_rgb[1]*.1)
+                ATTR.set(_node,'ambientColorB',_rgb[2]*.1)        
+                ATTR.set(_node,'transparency',.5)
                 ATTR.set(_node,'incandescence',0)
       
     if not _set:
@@ -1097,6 +1104,8 @@ def colorControl(target = None, direction = 'center', controlType = 'main', push
             override_color(t,index=_v,pushToShapes=pushToShapes )
             
         if shaderSetup:
+            mc.sets(t, edit=True, remove = 'initialShadingGroup')
+            
             if _type in ['nurbsSurface','mesh']:
                 mc.sets(t, e=True, forceElement = _set)                
             else:
@@ -1104,10 +1113,19 @@ def colorControl(target = None, direction = 'center', controlType = 'main', push
                     log.debug("|{0}| >> s: {1} ...".format(_str_func,s))  
                     _type = VALID.get_mayaType(s)
                     if _type in ['nurbsSurface','mesh']:
-                        mc.sets(s, e=True, forceElement = _set)
+                        mc.sets(s, edit=True, forceElement = _set)
+                        mc.sets(s, remove = 'initialShadingGroup')
+                        try:
+                            mc.disconnectAttr ('{0}.instObjGroups.objectGroups'.format(s),
+                                               'initialShadingGroup.dagSetMembers')
+                        except:
+                            pass
+                        
+                        
                     else:
-                        log.debug("|{0}|  >> Not a valid target: {1} | {2}".format(_str_func,s,_type))            
-            
+                        log.debug("|{0}|  >> Not a valid target: {1} | {2}".format(_str_func,s,_type))
+                    
+        mc.sets(t, edit=True, remove = 'initialShadingGroup')
     return True
 
 

@@ -340,7 +340,7 @@ def get_vector_between_targets(targetList=None):
     
     for i,p in enumerate(l_pos[:-1]):
         d = MATHUTILS.get_vector_of_two_points(p,l_pos[i+1])
-        log.info("|{0}| >> {1} |---------| {2} : {3}".format(_str_func,targetList[i],targetList[i+1],d))
+        log.debug("|{0}| >> {1} |---------| {2} : {3}".format(_str_func,targetList[i],targetList[i+1],d))
         l_vec.append(d)
         
     return l_vec
@@ -394,7 +394,7 @@ def offsetShape_byVector(dag=None, distance = 1, origin = None, component = 'cv'
     If origin is None, juse the center of each shape
     """
     _str_func = 'offsetShape_byVector'
-    log.info("|{0}| >> dag: {1} | distance: {2} | origin: {3} | component: {4}".format(_str_func,
+    log.debug("|{0}| >> dag: {1} | distance: {2} | origin: {3} | component: {4}".format(_str_func,
                                                                                        dag,
                                                                                        distance,
                                                                                        origin,
@@ -405,7 +405,7 @@ def offsetShape_byVector(dag=None, distance = 1, origin = None, component = 'cv'
     if VALID.isListArg(origin):
         _originUse = origin
     elif VALID.objString(origin,noneValid=True):
-        log.info("|{0}| >> Getting origin from transform of origin string: {1}".format(_str_func, origin))
+        log.debug("|{0}| >> Getting origin from transform of origin string: {1}".format(_str_func, origin))
         _originUse = POS.get(origin)
     
     if VALID.is_shape(dag):
@@ -414,18 +414,19 @@ def offsetShape_byVector(dag=None, distance = 1, origin = None, component = 'cv'
         l_shapes = mc.listRelatives(dag,shapes=True, fullPath= True)
         
     
-    for s in l_shapes:
-        log.info("|{0}| >> On shape: {1}".format(_str_func, s))        
+    for i,s in enumerate(l_shapes):
+        log.debug("|{0}| >> On shape: {1}".format(_str_func, s))        
         if _originUse is None:
             #_trans = VALID.getTransform(dag)
             _origin = POS.get_bb_center(s)
-            log.info("|{0}| >> Getting origin from center of s: {1}".format(_str_func, _origin))
+            log.debug("|{0}| >> Getting origin from center of s: {1}".format(_str_func, _origin))
         else:
             _origin = _originUse
     
-        _l_source = mc.ls("{0}.{1}[*]".format(dag,component),flatten=True)
+        _l_source = mc.ls("{0}.{1}[*]".format(s,component),flatten=True,long=True)
         
-        for i,c in enumerate(_l_source):
+        for ii,c in enumerate(_l_source):
+            log.debug("|{0}| >> Shape {1} | Comp: {2} | {3}".format(_str_func, i, ii, c))            
             set_vectorOffset(c,_origin,distance)
         
     return True
@@ -463,6 +464,7 @@ def get_average_position(posList):
         posZ.append(posBuffer[2])
     return [float(sum(posX)/len(posList)), float(sum(posY)/len(posList)), float(sum(posZ)/len(posList))]
 
+
 def get_pos_by_vec_dist(startPos,vec,distance = 1):
     """
     Get a point along a ray given a point, ray and distance along that ray 
@@ -498,6 +500,8 @@ def get_pos_by_axis_dist(obj, axis, distance = 1):
     obj =  VALID.mNodeString(obj)
     _vector = MATHUTILS.get_obj_vector(obj,axis,False)
     return get_pos_by_vec_dist(POS.get(obj),_vector,distance)
+
+
     
 def get_posList_fromStartEnd(start=[0,0,0],end=[0,1,0],split = 1):
     _str_func = 'get_posList_fromStartEnd'
@@ -550,9 +554,6 @@ def get_closestTarget(source = None, objects = None):
         pos = POS.get(obj)
         l_dists.append (get_distance_between_points(_point, pos))
     return objects[(l_dists.index ((min(l_dists))))]    
-
-    
-
 
 def get_closest_point(source = None, targetSurface = None, loc = False):
     """

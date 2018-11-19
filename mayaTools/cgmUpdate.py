@@ -34,7 +34,6 @@ _pathPull =  "https://bitbucket.org/jjburton/cgmtools/get/"
 _pathMount  = 'https://api.bitbucket.org/2.0/repositories/jjburton/cgmtools/commits/'
 _pathRepos = 'https://api.bitbucket.org/2.0/repositories/jjburton/cgmtools/'
 
-#_defaultBranch = 'MRS'
 _defaultBranch = 'stable'
 _sep = os.sep
 
@@ -44,7 +43,7 @@ CGM_BUILDS_DAT = {}
 import maya.cmds as mc
 import maya.mel as mel
 
-def get_install_path(confirm = False):
+def get_install_path(confirm = False,branch=_defaultBranch):
     """
     Install to this location...
     """
@@ -84,7 +83,7 @@ def get_install_path(confirm = False):
     
     if confirm:
         _res_confirm = mc.confirmDialog(title="Install cgmTools",
-                                        message='Welcome to the stand alone cgm installer. Would you like to install your tools here: \n {0} \n \n {1}'.format(_path,_warn),
+                                        message='Welcome to the stand alone cgm installer. Would you like to install your tools here: \n {0} \n \n {1} \n Branch: {2}'.format(_path,_warn,branch),
                                         messageAlign='center',
                                         button=['OK', 'Pick New','Cancel'],
                                         defaultButton='OK',
@@ -96,7 +95,7 @@ def get_install_path(confirm = False):
             log.debug("|{0}| >> pick...".format(_str_func))
             
             _res_pick = mc.fileDialog2(dialogStyle=2,
-                                       cap = "Pick a new location please",
+                                       cap = "Pick a new location please. Warning - if this path isn't in Maya's path library, install will fail.",
                                        startingDirectory = _path,
                                        fileMode = 2,
                                        okCaption = 'Install')
@@ -465,7 +464,7 @@ def here(branch = _defaultBranch, idx = 0, cleanFirst = True):
     """
     """
     _str_func = 'here'
-    _path = get_install_path(True)
+    _path = get_install_path(True,branch)
     if not _path:
         return log.error("|{0}| >>No Path picked...".format(_str_func,_path))
 

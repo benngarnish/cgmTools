@@ -36,7 +36,7 @@ import cgmUpdate
 reload(cgmUpdate)
 
 #>>> Root settings =============================================================
-__version__ = 'Alpha - 0.02012018'
+__version__ = 'Alpha - 0.08272018 - 1'
 __toolname__ ='cgmUpdate'
 _commit_limit = 12
 
@@ -138,7 +138,8 @@ class ui(cgmUI.cgmGUI):
         if _lastUpdate == 'None':
             return log.error("No last update found. Can't check for updates")
         
-        _lastBranch = _lastUpdate[0]
+        try:_lastBranch = _lastUpdate[0]
+        except:_lastBranch = 'MRS'
         
         try:_lastHash = _lastUpdate[1]
         except:_lastHash = None
@@ -169,7 +170,7 @@ class ui(cgmUI.cgmGUI):
             log.debug("|{0}| >> go!".format(_str_func))
             
             try:
-                cgmUpdate.here(_branch,0)
+                cgmUpdate.here(_lastBranch,0)
 
                 try:self.var_lastUpdate
                 except:self.var_lastUpdate = cgmMeta.cgmOptionVar('cgmVar_branchLastUpdate', defaultValue = ['None'])                
@@ -229,7 +230,8 @@ class ui(cgmUI.cgmGUI):
         _lastBranch = None
         _lastHash = None
         
-        _lastUpdate = self.var_lastUpdate.getValue()
+        _lastUpdate = self.var_lastUpdate.getValue() or None
+        
         if _lastUpdate[0] != 'None':
             try:_lastBranch = _lastUpdate[0] 
             except:pass
@@ -238,7 +240,7 @@ class ui(cgmUI.cgmGUI):
             try:_lastMsg = _lastUpdate[2]
             except:pass
             try:_lastDate = _lastUpdate[3]
-            except:pass
+            except:_lastDate = None
             
         result = mc.confirmDialog(title="Update your local cgmTools...",
                                  message='Are you sure you want to get and update to build? \n Last update: {4} \n Selected: [{0}] | [{1}] \n Last: [{2}] | [{3}]'.format(_branch,
@@ -268,7 +270,7 @@ class ui(cgmUI.cgmGUI):
                 
                 self.uiUpdate_topReport()
             except Exception,err:
-                print err
+                pprint.pprint(vars())
             finally:pass
         else:
             return log.error("|{0}| update cancelled".format(_str_func))

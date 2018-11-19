@@ -35,10 +35,13 @@ import cgm.core.tools.toolbox as TOOLBOX
 #reload(TOOLBOX)
 import cgmToolbox
 from cgm.core.tools import dynParentTool as DYNPARENTTOOL
+reload(DYNPARENTTOOL)
 from cgm.core.mrs import Builder as RBUILDER
 from cgm.core.lib import node_utils as NODES
 from cgm.core.tools.markingMenus import cgmMMPuppet as MMPuppet
-#reload(MMPuppet)
+reload(MMPuppet)
+import cgm.core.mrs.Animate as MRSANIMATE
+reload(MRSANIMATE)
 #reload(mmTemplate)
 #from cgm.core.lib.zoo import baseMelUI as mUI
 from cgm.lib import search
@@ -52,7 +55,8 @@ reload(SETTOOLS)
 #from cgm.tools import locinator
 #from cgm.tools import tdTools
 #from cgm.tools import attrTools
-
+import cgm.core.rig.general_utils as RIGGEN
+reload(RIGGEN)
 import cgm.core.lib.name_utils as NAMES
 from cgm.core.tools.lib import tool_chunks as UICHUNKS
 import cgm.core.tools.lib.tool_calls as TOOLCALLS
@@ -243,7 +247,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
         elif _mode == 3:
             log.debug("|{0}| >> puppet mode...".format(self._str_MM))
             self.bUI_radialRoot_puppet(parent)  
-            MMPuppet.bUI_lower(self, parent)
+            MRSANIMATE.mmUI_radial(self, parent)
         elif _mode == 4:
             log.debug("|{0}| >> dev mode...".format(self._str_MM))                                        
             self.bUI_radialRoot_dev(parent)
@@ -269,7 +273,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
             self.bUI_menuBottom_sets(parent)            
         elif _mode == 3:
             log.debug("|{0}| >> puppet mode bottom...".format(self._str_MM))
-            MMPuppet.uiOptionMenu_build(self, parent)
+            MRSANIMATE.mmUI_lower(self, parent)
             
         elif _mode == 4:
             log.debug("|{0}| >> dev mode bottom...".format(self._str_MM))              
@@ -311,7 +315,10 @@ class cgmMarkingMenu(cgmUI.markingMenu):
                     #c='import webbrowser;webbrowser.open("http://www.cgmonks.com/tools/maya-tools/cgmmarkingmenu/");')        
         
         mc.menuItem(p=uiHelp,l = 'Reset Options',
-                    c=cgmGEN.Callback(self.button_action,self.reset))   
+                    c=cgmGEN.Callback(self.button_action,self.reset))           
+        mc.menuItem(p=uiHelp,l = 'Force Kill MM',
+                    c=lambda *a:killUI())
+                    #c=cgmGEN.Callback(self.button_action,self.reset))   
         
         mc.menuItem(p=uiHelp,l='Reload local python',
                     c = lambda *a: mel.eval('python("from cgm.core import cgm_Meta as cgmMeta;from cgm.core import cgm_Deformers as cgmDeformers;from cgm.core import cgm_General as cgmGen;from cgm.core.rigger import RigFactory as Rig;from cgm.core import cgm_PuppetMeta as cgmPM;from cgm.core import cgm_RigMeta as cgmRigMeta;import Red9.core.Red9_Meta as r9Meta;import cgm.core;cgm.core._reload();import maya.cmds as mc;import cgm.core.cgmPy.validateArgs as cgmValid")'))        
@@ -342,7 +349,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
         self.var_rayCastDragInterval = cgmMeta.cgmOptionVar('cgmVar_rayCastDragInterval', defaultValue = .2) 
 
         LOCINATOR.uiSetupOptionVars(self)
-        MMPuppet.uiSetupOptionVars(self)
+        #MMPuppet.uiSetupOptionVars(self)
         TOOLBOX.uiSetupOptionVars_curveCreation(self)
         
     #@cgmGEN.Timer
@@ -359,7 +366,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
         mc.menuItem(p=parent,
                     en = self._b_sel,
                     l = 'Reset',
-                    c = lambda *a:ml_resetChannels.main(**{'transformsOnly': self.var_resetMode.value}),
+                    c = lambda *a:RIGGEN.reset_channels_fromMode(self.var_resetMode.value),
                     #c = mmCallback(ml_resetChannels.main,**{'transformsOnly': self.var_resetMode.value}),
                     rp = "S")           
         
@@ -377,7 +384,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
         mc.menuItem(p=parent,
                     en = self._b_sel,
                     l = 'Reset',
-                    c = lambda *a:ml_resetChannels.main(**{'transformsOnly': self.var_resetMode.value}),
+                    c = lambda *a:RIGGEN.reset_channels_fromMode(self.var_resetMode.value),
                     #c = mmCallback( ml_resetChannels.main,**{'transformsOnly': self.var_resetMode.value}),
                     rp = "S")   
  
@@ -430,7 +437,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
                     en = _b_sel,
                     l = 'Reset',
                     #c = lambda *a:SETTOOLS.uiFunc_selectAndDo(ml_resetChannels.main,**{'transformsOnly': self.var_resetMode.value}),                    
-                    c = lambda *a:ml_resetChannels.main(**{'transformsOnly': self.var_resetMode.value}),
+                    c = lambda *a:RIGGEN.reset_channels_fromMode(self.var_resetMode.value),
                     rp = "S")   
  
         
@@ -466,14 +473,13 @@ class cgmMarkingMenu(cgmUI.markingMenu):
         mc.menuItem(p=parent,
                     en = self._b_sel,
                     l = 'Reset',
-                    c = lambda *a:ml_resetChannels.main(**{'transformsOnly': self.var_resetMode.value}),
+                    c = lambda *a:RIGGEN.reset_channels_fromMode(self.var_resetMode.value),
                     #c = mmCallback( ml_resetChannels.main,**{'transformsOnly': self.var_resetMode.value}),
                     rp = "S")   
   
         mc.menuItem(p=parent,l='Key',subMenu=True,
                     en = self._b_sel,
                     rp = 'E')
-        
         
         if self._b_sel:
             mc.menuItem(l = 'Regular',
@@ -490,7 +496,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
                         rp = "N")     
             
         LOCINATOR.uiRadialMenu_root(self,parent,'NE')        
-        MMPuppet.bUI_radial(self, parent)
+        MRSANIMATE.mmUI_radial(self, parent)
         
     def bUI_radialRoot_dev(self,parent):
         #Radial---------------------------------------------------
@@ -557,7 +563,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
         mc.menuItem(p=parent,l = 'Select',
                     c = lambda *a:SETTOOLS.uiFunc_multiSetsAction(None,'select'))
         mc.menuItem(p=parent,l = 'Reset',
-                    c = lambda *a:SETTOOLS.uiFunc_selectAndDo(ml_resetChannels.main,**{'transformsOnly': self.var_resetMode.value}))                   
+                    c = lambda *a:SETTOOLS.uiFunc_selectAndDo(RIGGEN.reset_channels_fromMode,self.var_resetMode.value))                   
         mc.menuItem(p=parent,l = 'Report',
                     c = lambda *a:SETTOOLS.uiFunc_multiSetsAction(None,'report'))
         
@@ -795,7 +801,7 @@ class cgmMarkingMenu(cgmUI.markingMenu):
             #self.uiOptions_menuMode = []		
             _v = self.var_resetMode.value
             
-            for i,item in enumerate(['Default','Transform Attrs']):
+            for i,item in enumerate(SHARED.l_resetModes):
                 if i == _v:
                     _rb = True
                 else:_rb = False
@@ -1740,7 +1746,8 @@ class cgmMarkingMenu(cgmUI.markingMenu):
 def killUI():
     log.debug("killUI...")
     _var_mode = cgmMeta.cgmOptionVar('cgmVar_cgmMarkingMenu_menuMode', defaultValue = 0)
-    if _var_mode.value in [0,1,2]:
+    log.debug('mode: {0}'.format(_var_mode))    
+    if _var_mode.value in [0,1,2,3]:
         log.debug('animMode killUI')
         
         #IsClickedOptionVar = cgmMeta.cgmOptionVar('cgmVar_IsClicked')

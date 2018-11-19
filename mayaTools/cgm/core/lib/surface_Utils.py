@@ -12,11 +12,11 @@ import pprint
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 # From Maya =============================================================
 import maya.cmds as mc
-from maya import OpenMaya
+from maya import OpenMaya as om
 
 # From Red9 =============================================================
 from Red9.core import Red9_Meta as r9Meta
@@ -81,7 +81,7 @@ def get_splitValues(surface = None, values = [], mode='u',
         
     hat tip: http://ewertb.soundlinker.com/mel/mel.074.php
     """
-    _str_func = 'get_dat'
+    _str_func = 'get_splitValues'
     log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
     _shape = SHAPES.get_nonintermediate(surface)
     if mode == 'u':
@@ -95,47 +95,78 @@ def get_splitValues(surface = None, values = [], mode='u',
         
     l_sets = []
     
+    log.debug("|{0}| >>  l_base: {1}".format(_str_func,l_base))                    
+    
     for i,v in enumerate(values):
+        log.debug("|{0}| >>  Processing: {1} | {2}".format(_str_func,i,v)+"-"*40)        
         _last = False
         if v == values[-1]:
+            log.debug("|{0}| >>  last...".format(_str_func))                    
             _last = True
+            
         if preInset:
             v+=preInset
+            log.debug("|{0}| >>  preinset: {1}".format(_str_func,v))                    
+            
         _l = [v]
     
+        _stop = False
         for knot in l_base:
-            if knot > v:
-                if v == values[-1]:
-                    if knot < maxKnot:
-                        _l.append(knot)
-                elif _last != True and knot < values[i+1]:
+            if _stop or MATH.is_float_equivalent(knot,v) == v:continue            
+            log.debug("|{0}| >>  checking knot: {1}".format(_str_func,knot))
+            if _last:
+                if knot > v:
+                    _stop = True
                     _l.append(knot)
+                        
+            if knot > v or knot < v:
+                if _last != True and knot < values[i+1] and knot > v:
+                    _l.append(knot)
+            log.debug("|{0}| >>  knot add: {1}".format(_str_func,_l))
+                
+            """
+            if v == values[-1]:
+                if knot < maxKnot:
+                    _l.append(knot)
+            elif _last != True and knot < values[i+1]:
+                _l.append(knot)"""
     
         if _last and insertMax:
             _l.append(maxKnot)
             
-        if not _last:
+        if _last != True:
             _l.append(values[i+1])
     
         if insertMin and i == 0:
             _l.insert(0,minKnot)
     
         if postInset:
-            v =  _l[-1] + postInset
-            log.debug("|{0}| >>  postInset: {1} | new: {2}".format(_str_func,_l[-1],v))
-            
+            vPost =  _l[-1] + postInset
+            if vPost < _l[-2]:
+                log.debug("|{0}| >>  alternate postInset".format(_str_func))
+                vPost = _l[-2] + postInset
+                
+            log.debug("|{0}| >>  postInset: {1} | new: {2}".format(_str_func,_l[-1],vPost))
             if len(_l) > 1:
-                if v > max(_l[:-1]):
-                    _l[-1] = v
+                if vPost > max(_l[:-1]):
+                    log.debug("|{0}| >>  v post creater the max".format(_str_func))                    
+                    _l[-1] = vPost
                 else:
                     _l = _l[:-1]
             else:
-                _l.append(v)
-            
+                _l.append(vPost)
+            """
+            if _last != True:
+                for v2 in _l:
+                    if v2 > v:
+                        _l.remove(v2)"""
+        
         
         _l = LISTS.get_noDuplicates(_l)
         _l.sort()
+        
         l_sets.append(_l)                        
+        log.debug("|{0}| >>  result: {1} | {2} | {3}".format(_str_func,i,v,_l))        
     
     l_pre = copy.copy(l_sets)
     #pprint.pprint(vars())
@@ -166,9 +197,10 @@ def get_splitValues(surface = None, values = [], mode='u',
     for i,uSet in enumerate(l_sets):
         _loftCurves = [getCurve(uValue, l_newCurves) for uValue in uSet]
         
+        """
         if len(uSet)<2:
             l_finalCurves.append(mc.duplicate(_loftCurves[0])[0])
-            continue
+            continue"""
         
         log.debug("|{0}| >> {1} | u's: {2}".format(_str_func,i,uSet))
         """
@@ -178,27 +210,38 @@ def get_splitValues(surface = None, values = [], mode='u',
                                 _pair = [c,l_newCurves[i+1]]"""
 
 
-        crvBase = mc.duplicate(_loftCurves[0])[0]
-        crvEnd = mc.duplicate(_loftCurves[-1])[0]
-
-        l_mainCurves = [crvBase,crvEnd]
+        if len(_loftCurves)==1:
+            l_mainCurves = [mc.duplicate(_loftCurves[0])[0]]
         
-        if curvesConnect:
-            log.debug("|{0}| >> {1} | Making connectors".format(_str_func,i))
-            d_epPos = {}
+        else:
+            crvBase = mc.duplicate(_loftCurves[0])[0]
+            crvEnd = mc.duplicate(_loftCurves[-1])[0]
     
-            for i,crv in enumerate(_loftCurves):
-                _l = CURVES.getUSplitList(crv,connectionPoints,rebuild=True,rebuildSpans=30)[:-1]
+            l_mainCurves = [crvBase,crvEnd]
+            
+            if curvesConnect:
+                log.debug("|{0}| >> {1} | Making connectors".format(_str_func,i))
+                d_epPos = {}
+                
+                
     
-                for ii,p in enumerate(_l):
-                    if not d_epPos.get(ii):
-                        d_epPos[ii] = []
-                    _l = d_epPos[ii]
-                    _l.append(p)
+                for i,crv in enumerate(_loftCurves):
+                    _l = CURVES.getUSplitList(crv,connectionPoints,rebuild=True,rebuildSpans=30)[:-1]
+                    for ii,p in enumerate(_l):
+                        if not d_epPos.get(ii):
+                            d_epPos[ii] = []
+                        _l = d_epPos[ii]
+                        _l.append(p)
+        
+                for k,points in d_epPos.iteritems():
+                    log.debug("|{0}| >> {1} | k: {1} | points: {2}".format(_str_func,k,points))
+                    try:
+                        crv_connect = mc.curve (d=1, ep = points, os=True) 
     
-            for k,points in d_epPos.iteritems():
-                crv_connect = CURVES.create_fromList(posList=points)
-                l_mainCurves.append(crv_connect)
+                        #CURVES.create_fromList(posList=points)
+                        l_mainCurves.append(crv_connect)
+                    except Exception,err:
+                        print err
 
         for crv in l_mainCurves[1:]:
             CORERIG.shapeParent_in_place(l_mainCurves[0], crv, False)
@@ -210,7 +253,37 @@ def get_splitValues(surface = None, values = [], mode='u',
     mc.delete(l_newCurves)    
     return l_finalCurves
 
+def get_uvNormal(surface = None,u = .5, v= .5):
+    _str_func = 'get_normalAtPoint'
+    
+    selectionList = om.MSelectionList()
+    #mPoint_source = om.MFloatPoint(point[0], point[1], point[2])
 
+    #Create an empty MFloatPoint to receive the hit point from the call.
+    mPointArray_hits = om.MFloatPointArray()
+    spc = om.MSpace.kWorld	    
+    
+
+    selectionList.add(surface)
+    surfacePath = om.MDagPath()
+    selectionList.getDagPath(0, surfacePath)
+    surfaceFn = om.MFnNurbsSurface(surfacePath)
+
+
+    #log.debug("Raw: {0} | {1}".format(uRaw,vRaw))
+    #__d = DIST.get_normalized_uv(mesh,uRaw,vRaw)#normalize data
+
+    #l_rawUV.append([uRaw,vRaw])
+    #l_uv.append(__d['uv'])
+
+    #....normal
+    try:
+        _res = surfaceFn.normal( u, v,om.MSpace.kWorld)
+        return [_res.x, _res.y, _res.z]
+    except Exception,err:
+        log.warning(">>> {0} >> Failed to process normal: {1}".format(_str_func,err))
+        return [0,0,0]
+    
 
 def get_dat(surface = None, uKnots = True, vKnots = True):
     """
@@ -233,7 +306,6 @@ def get_dat(surface = None, uKnots = True, vKnots = True):
     
     _short = NAMES.short(surface)
     mSurfaceInfo = cgmMeta.asMeta( NODES.create(_short,'surfaceInfo') )
-    
     mSurfaceInfo.doConnectIn('inputSurface','{0}.worldSpace'.format(surface))
     
     if uKnots:

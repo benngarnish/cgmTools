@@ -301,7 +301,7 @@ class cgmNode(r9Meta.MetaClass):
                 return ("Dead mNode : Last good dag path was: %s" % object.__getattribute__(self, "_lastDagPath"))
             except:
                 return "THIS NODE BE DEAD BY THINE OWN HAND"
-            
+    """
     def hasAttr(self, attr):
         '''
         simple wrapper check for attrs on the mNode itself.
@@ -323,7 +323,7 @@ class cgmNode(r9Meta.MetaClass):
                 #log.error('hasAttr failure...{0}'.format(err))#...this was just to see if I had an error
                 for arg in e.args:
                     log.error(arg)                  
-                return mc.objExists("{0}.{1}".format(self.mNode, attr)) 
+                return mc.objExists("{0}.{1}".format(self.mNode, attr)) """
             
     #========================================================================================================    
     #>>> Overloads - Departures from red9's core...
@@ -551,41 +551,41 @@ class cgmNode(r9Meta.MetaClass):
         :returns
             newName(str)
         """   
-        try:
-            if fastName:
-                d_updatedNamesDict = self.getNameDict()
-                ignore = kws.get('ignore') or []
-                if 'cgmName' not in d_updatedNamesDict.keys():
-                    test = {}
-                    if self.getMayaType() !='group' and 'cgmName' not in ignore:
-                        _short = self.getShortName()
-                        for k,v in d_updatedNamesDict.iteritems():
-                            if v and v in _short:
-                                _short = _short.replace(v,'')
-                        _short = NAMES.clean(_short)
-                        d_updatedNamesDict['cgmName'] = _short
-    
-                _str_nameCandidate =  nameTools.returnCombinedNameFromDict(d_updatedNamesDict)
-                mc.rename(self.mNode, _str_nameCandidate	)
-                if nameChildren:
-                    for mObj in validateObjListArg(TRANS.descendents_get(self.mNode)):
-                        mObj.doName()
-                        
-            else:
-                if sceneUnique:
-                    log.error("Remove this cgmNode.doName sceneUnique call")
-                if self.isReferenced():
-                    log.error("'%s' is referenced. Cannot change name"%self.mNode)
-                    return False	
-                #Name it
-                NameFactory(self).doName(nameChildren = nameChildren,fastIterate=fastIterate,**kws)	  
-            return self.mNode
-        except Exception,err:
-            cgmGEN.cgmExceptCB(Exception,err,localDat=vars())
+        #try:
+        if fastName:
+            d_updatedNamesDict = self.getNameDict()
+            ignore = kws.get('ignore') or []
+            if 'cgmName' not in d_updatedNamesDict.keys():
+                test = {}
+                if self.getMayaType() !='group' and 'cgmName' not in ignore:
+                    _short = self.getShortName()
+                    for k,v in d_updatedNamesDict.iteritems():
+                        if v and v in _short:
+                            _short = _short.replace(v,'')
+                    _short = NAMES.clean(_short)
+                    d_updatedNamesDict['cgmName'] = _short
+
+            _str_nameCandidate =  nameTools.returnCombinedNameFromDict(d_updatedNamesDict)
+            mc.rename(self.mNode, _str_nameCandidate	)
+            if nameChildren:
+                for mObj in validateObjListArg(TRANS.descendents_get(self.mNode)):
+                    mObj.doName()
+                    
+        else:
+            if sceneUnique:
+                log.error("Remove this cgmNode.doName sceneUnique call")
+            if self.isReferenced():
+                log.error("'%s' is referenced. Cannot change name"%self.mNode)
+                return False	
+            #Name it
+            NameFactory(self).doName(nameChildren = nameChildren,fastIterate=fastIterate,**kws)	  
+        return self.mNode
+        #except Exception,err:
+            #cgmGEN.cgmExceptCB(Exception,err,localDat=vars())
             
-    def getNameDict(self):
+    def getNameDict(self,**kws):
         reload(nameTools)
-        return nameTools.returnObjectGeneratedNameDict(self.mNode) or {} 
+        return nameTools.returnObjectGeneratedNameDict(self.mNode,**kws) or {} 
     
     def doTagAndName(self,d_tags, **kws):
         """
@@ -886,7 +886,7 @@ class cgmNode(r9Meta.MetaClass):
         log.warning("|{0}| >> please remove call...".format(_str_func))
         return self.delAttr(a)
     
-    def resetAttrs(self, attrs = None, transformsOnly = None, visible = None):
+    def resetAttrs(self, attrs = None, transformsOnly = None, visible = None,keyable=True):
         """   
         Reset specified attributes to their default values
         
@@ -900,19 +900,30 @@ class cgmNode(r9Meta.MetaClass):
         obj = self.p_nameShort
 
         if attrs == None:
-            attrs = mc.listAttr(obj, keyable=True, unlocked=True) or False
+            attrs = mc.listAttr(obj, keyable=keyable, unlocked=True) or False
         else:
             attrs = VALID.listArg(attrs)
+            
         l_trans = ['translateX','translateY','translateZ','rotateX','rotateY','rotateZ','scaleX','scaleY','scaleZ']
-        _reset = []
+        _reset = {}
+        
+        d_defaults = {}
+        for plug in ['defaultValues','transResets']:
+            if self.hasAttr(plug):
+                d_defaults = getattr(self,plug)
+        
         for attr in attrs:
             try:
                 if transformsOnly is not None and transformsOnly:
                     if ATTR.get_nameLong(obj,attr) not in l_trans:
                         continue
-                default = mc.attributeQuery(attr, listDefault=True, node=obj)[0]
+                dVal = d_defaults.get(attr)
+                if dVal is not None:
+                    default = dVal
+                else:
+                    default = mc.attributeQuery(attr, listDefault=True, node=obj)[0]
                 ATTR.set(obj,attr,default)
-                _reset.append(attr)
+                _reset[attr] = default
             except Exception,err:
                 log.error("{0}.{1} resetAttrs | error: {2}".format(obj, attr,err))   	
         return _reset
@@ -1230,6 +1241,7 @@ class cgmNode(r9Meta.MetaClass):
             #print(cgmGEN._str_baseStart + "  Errors...")
             #for a in err.args:
                 #log.error(a)
+            #raise Exception,err
             cgmGEN.cgmException(Exception,err)
         return _res    
     
@@ -3005,7 +3017,23 @@ class cgmObject(cgmNode):
     def getTransformInverseDirection(self,*a,**kws):
         return TRANS.transformInverseDirection(self,*a,**kws)     
     def getTransformInversePoint(self,*a,**kws):
-        return TRANS.transformInversePoint(self,*a,**kws)     
+        return TRANS.transformInversePoint(self,*a,**kws)
+    
+    def dagLock(self,state=True,ignore = None):
+        _attrs = ['tx','ty','tz','rx','ry','rz','sx','sy','sz','v']
+        _ignore = VALID.listArg(ignore)
+        if ignore:
+            for a in _ignore:
+                if a in _attrs:
+                    _attrs.remove(a)
+        kws = {'lock':True,
+               'visible':False,
+               'keyable':False}
+        if not state:
+            for k,v in kws.iteritems():
+                kws[k] = not v
+        return ATTR.set_standardFlags(self.mNode,_attrs, **kws)
+    
     #========================================================================================================
     #>>> Get info...
     #========================================================================================================
@@ -3075,14 +3103,14 @@ class cgmObject(cgmNode):
         """ Copy the transform from a source object to the current instanced maya object. """
         return RIGGING.match_transform(self, source,rotateOrder,rotateAxis,rotatePivot,scalePivot)
 
-    def doGroup(self,maintain=False, parentTo = True, asMeta = False, typeModifier = None):
+    def doGroup(self,maintain=False, parentTo = True, asMeta = False, typeModifier = None, setClass = False):
         #buffer = rigging.groupMeObject(self.mNode,True,maintain)  
         buffer = TRANS.group_me(self,parentTo,maintain)
         if typeModifier:
             ATTR.store_info(buffer,'cgmTypeModifier',typeModifier)
             self.connectChildNode(buffer,typeModifier + 'Group','source')
         if buffer and asMeta:
-            mGrp = cgmObject(buffer)
+            mGrp = validateObjArg(buffer,'cgmObject',setClass=setClass)
             if typeModifier:
                 mGrp.doName()
             return mGrp
@@ -4207,9 +4235,8 @@ class cgmObjectSet(cgmNode):
         try:
             mc.sets(info,add = self.mNode)
             #log.debug("'%s' added to '%s'!"%(info,self.mNode))  	
-            log.info("|{0}| >> Appended to objectSet: {1} | data: {2}".format(_str_func,self.p_nameShort,info))   
-        except Exception, error:
-            log.error("'append fail | {0}' failed to add to '{1}' | {2}"%(info,self.mNode,error))    
+        except Exception, err:
+            cgmGEN.cgmException(Exception,err,msg=vars())
 
     addObj = append
     add = append
@@ -5221,6 +5248,10 @@ class cgmAttr(object):
     def asCombinedShortName(self):
         return '%s.%s'%(self.obj.getShortName(),self.attr)  
     p_combinedShortName = property(asCombinedShortName) 
+
+    def asCombinedLongName(self):
+        return '{0}.{1}'.format(self.obj.p_nameLong,self.attr)  
+    p_combinedLongName = property(asCombinedLongName)
 
     #>>> Property - p_nameLong ================== 
     def getEnum(self):
@@ -6677,8 +6708,8 @@ def asMeta(*args,**kws):
         if VALID.isListArg(arg):#make sure it's not a list
             return validateObjListArg(*args,**kws)
         return validateObjArg(*args,**kws)
-    except Exception,error:
-        cgmGEN.cgmExceptCB(Exception,error)
+    except Exception,err:
+        cgmGEN.cgmException(Exception,err,msg=vars())
         """
         log.error("cgmMeta.asMeta failure... --------------------------------------------------")
         if args:

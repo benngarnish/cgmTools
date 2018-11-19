@@ -19,7 +19,7 @@ import pprint
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 import maya.cmds as mc
 import maya
@@ -149,7 +149,8 @@ def snap_action(objects = None, snapMode = 'point',selectionMode = 'eachToLast',
         
         mc.select(objects)
         return
-    except Exception,err:cgmGEN.cgmExceptCB(Exception,err,localDat=vars())
+    except Exception,err:
+        cgmGEN.cgmException(Exception,err,msg=vars())
 
 from cgm.core.classes import DraggerContextFactory as cgmDrag
 reload(cgmDrag)
@@ -323,12 +324,13 @@ def specialSnap(obj = None, targets = None,
                 _offsetPos = DIST.get_pos_by_vec_dist(_pos_base,_m_normal,(_dist_firstHit))"""
             
             
-            cgmGEN.func_snapShot(vars())
+            #cgmGEN.func_snapShot(vars())
             POS.set(_obj,p_result)
             return
             
         POS.set(_obj,p)
-    except Exception,err:cgmGEN.cgmExceptCB(Exception,err,localDat=vars())
+    except Exception,err:
+        cgmGEN.cgmException(Exception,err,msg=vars())
 
 
 def snap(obj = None, targets = None,
@@ -639,14 +641,14 @@ def get_special_pos(targets = None,
                 l_res.append([pos[0],0.0,pos[2]])
         elif _arg.startswith('castAll'):
             _type =  _arg.split('castAll')[-1].lower()
-            log.info("|{0}| >> castAll mode: {1} | {2}".format(_str_func,mode,_type))
+            log.debug("|{0}| >> castAll mode: {1} | {2}".format(_str_func,mode,_type))
             pos = RAYS.get_cast_pos(_targets[0],mode,_type, None, mark=False, maxDistance=100000)
             l_res.append(pos)        
         elif _arg.startswith('cast'):
             _type =  _arg.split('cast')[-1].lower()
-            log.info("|{0}| >> cast mode: {1} | {2}".format(_str_func,mode,_type))
+            log.debug("|{0}| >> cast mode: {1} | {2}".format(_str_func,mode,_type))
             if len(_targets)>1:
-                log.info("|{0}| >> more than one target...".format(_str_func))            
+                log.debug("|{0}| >> more than one target...".format(_str_func))            
                 pos = RAYS.get_cast_pos(_targets[0],mode,_type, _targets[1:],mark=False, maxDistance=100000)
             else:
                 pos = RAYS.get_cast_pos(_targets[0],mode,_type, _targets,mark=False, maxDistance=100000)            

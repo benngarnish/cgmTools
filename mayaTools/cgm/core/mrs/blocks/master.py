@@ -47,14 +47,14 @@ from cgm.core import cgm_Meta as cgmMeta
 #=============================================================================================================
 #>> Block Settings
 #=============================================================================================================
-__version__ = 'alpha.1.03212018'
+__version__ = 'alpha.1.05312018'
 __autoTemplate__ = True
 __menuVisible__ = True
-__baseSize__ = 10,10,10
+__baseSize__ = 170,170,170
 
 #>>>Profiles =====================================================================================================
-d_build_profiles = {'unityMobile':{'addMotionJoint':True},
-                    'unityPC':{'addMotionJoint':True,},
+d_build_profiles = {'unityLow':{'addMotionJoint':True},
+                    'unityMed':{'addMotionJoint':True,},
                     'feature':{'addMotionJoint':False}}
 
 #>>>Attrs =======================================================================================================
@@ -62,8 +62,7 @@ l_attrsStandard = ['addMotionJoint',
                    'moduleTarget',
                    'baseSize',
                    'controlOffset',
-                   'numSpacePivots',
-                   'buildProfile']
+                   'numSpacePivots']
 
 d_attrsToMake = {'rootJoint':'messageSimple',
                  }
@@ -71,13 +70,12 @@ d_attrsToMake = {'rootJoint':'messageSimple',
 d_defaultSettings = {'version':__version__,
                      'baseName':'MasterBlock',
                      'addMotionJoint':True,
-                     'controlOffset':1,
+                     'controlOffset':.9999,
                      'numSpacePivots':1,
                      'attachPoint':'end'}
 
-d_wiring_prerig = {'msgLinks':['moduleTarget'],
-                   'msgLists':['prerigHandles']}
-d_wiring_template = {'msgLinks':['templateNull']}
+d_wiring_prerig = {'msgLinks':['moduleTarget']}
+d_wiring_template = {'msgLinks':['templateNull','noTransTemplateNull']}
 
 
 #MRP - Morpheus Rig Platform
@@ -98,11 +96,10 @@ def uiBuilderMenu(self,parent = None):
 #=============================================================================================================
 def define(self):
     _short = self.mNode
-    #self.translate = 0,0,0
-    #self.rotate = 0,0,0
     ATTR.set_alias(_short,'sy','blockScale')    
     self.setAttrFlags(attrs=['sx','sz','sz'])
     self.doConnectOut('sy',['sx','sz'])
+    ATTR.set_min(_short,'controlOffset',.001)
     
     try:mc.delete(self.getShapes())
     except:pass
@@ -112,7 +109,7 @@ def define(self):
 #>> Template
 #=============================================================================================================
 @cgmGEN.Timer
-def resize_masterShape(self,sizeBy=None):
+def resize_masterShape(self,sizeBy=None,resize=False):
     try:
         
         _short = self.p_nameShort        
@@ -120,16 +117,15 @@ def resize_masterShape(self,sizeBy=None):
         log.debug("|{0}| >> ".format(_str_func)+ '-'*80)
         _sel = mc.ls(sl=True)
         _bb = False
+        _bb = self.baseSize
         
-        if _sel:
-            _bb = TRANS.bbSize_get(_sel,False)
-        elif self.getBlockChildren():
-            sizeBy = mc.ls(self.getBlockChildren(asMeta=False))
-            _bb = TRANS.bbSize_get(sizeBy,False)
-        else:
-            _bb = self.baseSize
-            
-        self.baseSize = _bb
+        if resize:
+            if _sel:
+                _bb = TRANS.bbSize_get(_sel,False)
+            #elif self.getBlockChildren():
+            #    sizeBy = mc.ls(self.getBlockChildren(asMeta=False))
+            #    _bb = TRANS.bbSize_get(sizeBy,False)
+            self.baseSize = _bb
 
         log.debug("|{0}| >> _bb: {1}".format(_str_func,_bb))
 
@@ -138,10 +134,14 @@ def resize_masterShape(self,sizeBy=None):
         
         _average = MATH.average([_bb[0],_bb[2]])
         _size = _average * 1.5
-        _offsetSize = _average * .1    
+        _offsetSize = _average * .01    
         _blockScale = self.blockScale
         mTemplateNull = self.atUtils('stateNull_verify','template')
+        mNoTransformNull = self.atUtils('noTransformNull_verify','template')
         
+        if resize or self.controlOffset == .9999:
+            self.controlOffset = _offsetSize
+            
         #Main curve ===========================================================================
         _crv = CURVES.create_fromName(name='circle',direction = 'y+', size = 1)
         mCrv = cgmMeta.asMeta(_crv)
@@ -181,7 +181,41 @@ def resize_masterShape(self,sizeBy=None):
         mBBShape.doStore('cgmType','bbVisualize')
         mBBShape.doName()
         mBBShape.template = True
-        self.connectChildNode(mBBShape.mNode,'bbHelper')        
+        self.connectChildNode(mBBShape.mNode,'bbHelper')
+        
+        #Offset visualize ==================================================================
+        if self.getMessage('offsetHelper'):
+            self.offsetHelper.delete()
+            
+        #Need to guess our offset size based on bounding box volume
+        
+        mShape = self.getShapes(asMeta=True)[0]
+        l_return = mc.offsetCurve(mShape.mNode, distance = 1, ch=True )
+        pprint.pprint(l_return)
+        mHandleFactory.color(l_return[0],'center','sub',transparent = False)
+        
+        mOffsetShape = cgmMeta.validateObjArg(l_return[0], 'cgmObject',setClass=True)
+        mOffsetShape.p_parent = mNoTransformNull
+        #mOffsetShape.doSnapTo(self)
+        #mc.pointConstraint(self.mNode,mOffsetShape.mNode,maintainOffset=True)        
+        #mc.orientConstraint(self.mNode,mOffsetShape.mNode,maintainOffset=True)        
+        mOffsetShape.inheritsTransform = False
+        
+        mOffsetShape.dagLock()
+        
+        _arg = '{0}.distance = -{1}.controlOffset'.format(l_return[1],
+                                                          self.mNode)
+        NODEFACTORY.argsToNodes(_arg).doBuild()
+        #self.doConnectOut('controlOffset',"{0}.distance".format(l_return[1]))
+        
+        mOffsetShape.doStore('cgmName', self.mNode)
+        mOffsetShape.doStore('cgmType','offsetVisualize')
+        mOffsetShape.doName()        
+        
+        self.connectChildNode(mOffsetShape.mNode,'offsetHelper')                
+        
+        
+        
         
         return
         #Offset visualize ==================================================================
@@ -302,7 +336,8 @@ def template(self):
     return True
 
 def templateDelete(self):
-    self.setAttrFlags(attrs=['translate','rotate','sx','sz'], lock = False)
+    pass
+    #self.setAttrFlags(attrs=['translate','rotate','sx','sz'], lock = False)
 
 def is_template(self):
     if self.getShapes():
@@ -313,7 +348,8 @@ def is_template(self):
 #>> Prerig
 #=============================================================================================================
 def prerig(self):
-    self.atUtils('puppet_verify')
+    #self.atUtils('puppet_verify')
+    self.UTILS.puppet_verify(self)
     
     
     #Create preRig Null  ==================================================================================
@@ -325,7 +361,10 @@ def prerig(self):
     self.msgList_connect('prerigHandles',[self.mNode])
     
     if self.addMotionJoint:
-        mMotionJoint = mHandleFactory.addRootMotionHelper()
+        mMotionJoint = mHandleFactory.addRootMotionHelper(baseShape='arrowSingleFat3d', shapeDirection = 'y-')
+        mShape = mMotionJoint.doDuplicate(po=False)
+        SNAP.to_ground(mShape.mNode)
+        CORERIG.shapeParent_in_place(mMotionJoint.mNode, mShape.mNode, False,True)
         mMotionJoint.p_parent = mPrerigNull
         
 
@@ -358,6 +397,20 @@ def is_prerig(self):
 #>> rig
 #=============================================================================================================
 @cgmGEN.Timer
+def rig_prechecks(self):
+    #try:
+    #_short = self.d_block['shortName']
+    _str_func = 'rig_prechecks'
+    log.debug("|{0}| >>  ".format(_str_func)+ '-'*80)
+    log.debug("{0}".format(self))
+    """
+    if not self.mBlock.buildProfile:
+        self.l_precheckErrors.append('Must have build profile')
+        return False"""
+    
+    return True
+
+@cgmGEN.Timer
 def rig_cleanUp(self):
     #try:
     _short = self.d_block['shortName']
@@ -375,7 +428,7 @@ def rig_cleanUp(self):
     _spacePivots = mBlock.numSpacePivots
     
     ml_controlsAll = []
-    
+     
     #MasterControl =======================================================================
     log.debug("|{0}| >> MasterConrol | dynParent setup...".format(_str_func))
     reload(MODULECONTROL)
@@ -391,6 +444,7 @@ def rig_cleanUp(self):
                                mirrorSide= 'Centre',
                                mirrorAxis="translateX,rotateY,rotateZ",
                                noFreeze = True)
+        
         mMasterControl.masterGroup.setAttrFlags()
         ml_dynParents = [mMasterNull]
         
@@ -431,8 +485,8 @@ def rig_cleanUp(self):
         mControl = cgmMeta.validateObjArg(mControl,'cgmObject',setClass=True)
         mControl.parent = False
         
-        ATTR.copy_to(mBlock.moduleTarget.mNode,'cgmName',mControl.mNode,driven='target')
-        mControl.addAttr('cgmTypeModifier','rootMotion')
+        #ATTR.copy_to(mBlock.moduleTarget.mNode,'cgmName',mControl.mNode,driven='target')
+        mControl.doStore('cgmName','rootMotion')
         mControl.doName()
         
         
@@ -475,15 +529,19 @@ def rig_cleanUp(self):
         
         #>>>>> INDEX CONTROLS
         #>>>>> Setup VIS
+        mJoint.connectChildNode(mControl.mNode,'rigJoint','sourceJoint')
+        
+        """
         mc.parentConstraint(mControl.mNode,
                             mJoint.mNode,
                             maintainOffset = True)
         mc.scaleConstraint(mControl.mNode,
                            mJoint.mNode,
                            maintainOffset = True)            
-        
+        """
         ml_controlsAll.append(mControl)
         mPuppet.connectChildNode(mControl,'rootMotionHandle','puppet')#Connect
+        mMasterControl.connectChildNode(mControl,'rootMotionHandle','puppet')#Connect
         
     #Connect -------------------------------------------------------------
     mPuppet.msgList_connect('controlsAll', ml_controlsAll)
@@ -502,23 +560,67 @@ def rig_cleanUp(self):
     #mRigNull.version = self.d_block['buildVersion']
     #mRigNull.version = __version__
     mBlock.blockState = 'rig'
+    
     mBlock.template = True
+    mBlock.noTransTemplateNull.template=True
+    self.UTILS.rigNodes_store(self)
+    
     self.version = self.d_block['buildVersion']
+    
+    mMasterControl.doStore('version', self.d_block['buildVersion'])
     
     #log.info("|{0}| >> Time >> = {1} seconds".format(_str_func, "%0.3f"%(time.clock()-_start)))
     #except Exception,err:cgmGEN.cgmException(Exception,err)
 
+@cgmGEN.Timer
 def rigDelete(self):
-    self.template = False    
-    
-    return True
-    self.v = 1
-    try:self.moduleTarget.masterControl.delete()
+    try:
+        _str_func = 'rigDelete'
+        log.debug("|{0}| >> ...".format(_str_func,)+'-'*80)
+        log.debug(self)
+        self.template = False
+        self.noTransTemplateNull.template=True
+        mPuppet = self.moduleTarget
+        mRootMotion = self.moduleTarget.getMessageAsMeta('rootMotionHandle')
+        if mRootMotion:
+            mRootMotion.dynParentGroup.doPurge()
+            mRootMotion.masterGroup.delete()
+        
+        
+        self.moduleTarget.masterControl.dynParentGroup.doPurge()
+        
+        ml_spacePivots = self.moduleTarget.masterControl.msgList_get('spacePivots')
+        if ml_spacePivots:
+            for mObj in ml_spacePivots:
+                log.info("|{0}| >> SpacePivot: {1}".format(_str_func,mObj))  
+                for link in ['constraintGroup','constrainGroup','masterGroup']:
+                    mGroup = mObj.getMessageAsMeta(link)
+                    if mGroup:
+                        mGroup.delete()
+                        break
+                
+        self.moduleTarget.masterControl.masterGroup.delete()
+        
+        log.debug("|{0}| >> rigNodes...".format(_str_func,)+'-'*40)                             
+        ml_rigNodes = mPuppet.getMessageAsMeta('rigNodes')
+        for mNode in ml_rigNodes:
+            try:
+                log.debug("|{0}| >> deleting: {1}".format(_str_func,mNode))                     
+                mNode.delete()
+            except:
+                log.debug("|{0}| >> failed...".format(_str_func,mNode))         
+        
+        
+        
+        return True
+        self.v = 1
+        try:self.moduleTarget.masterControl.masterGroup.delete()
+        except Exception,err:
+            cgmGEN.cgmException(Exception,err,msg=vars())
+            raise Exception,err
+        return True
     except Exception,err:
-        cgmGEN.cgmExceptCB(Exception,err)
-        raise Exception,err
-    return True
-            
+        raise cgmGEN.cgmException(Exception,err,msg=vars())
 def is_rig(self):
     _str_func = 'is_rig'
     _l_missing = []
@@ -557,9 +659,17 @@ def skeleton_build(self):
             mJoint = self.rootMotionHelper.doCreateAt('joint')
             mPuppet.connectChildNode(mJoint,'rootJoint','module')
             mJoint.connectParentNode(self,'module','rootJoint')
-            self.copyAttrTo('cgmName',mJoint.mNode,'cgmName',driven='target')
+            mJoint.doStore('cgmName','ignore')            
+            #self.copyAttrTo('cgmName',mJoint.mNode,'cgmName',driven='target')
             mJoint.doStore('cgmTypeModifier','rootMotion')
             mJoint.doName()
+            
+            mJoint.radius = self.controlOffset
+            
+            
+            #self.atBlockUtils('skeleton_connectToParent')
+            if self.moduleTarget.masterNull.getMessage('skeletonGroup'):
+                mJoint.p_parent = self.moduleTarget.masterNull.skeletonGroup
             return mJoint.mNode
         
     except Exception,err:cgmGEN.cgmException(Exception,err

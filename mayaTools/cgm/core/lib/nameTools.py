@@ -13,7 +13,7 @@ Class Factory for
 # From Python =============================================================
 import copy
 import re
-
+import pprint
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
@@ -170,9 +170,9 @@ def returnCombinedNameFromDict(nameDict, stripInvalid = True):
     name(string)
     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     """
-    _str_funcName = "returnCombinedNameFromDict(%s)"%nameDict
-    log.debug(">>> %s "%(_str_funcName) + "="*75)   
-    if type(nameDict) is not dict:raise StandardError,"%s >>> nameDict is not type dict. type: %s"%(_str_funcName,type(nameDict))
+    _str_func = "returnCombinedNameFromDict(%s)"%nameDict
+    log.debug(">>> %s "%(_str_func) + "="*75)   
+    if type(nameDict) is not dict:raise StandardError,"%s >>> nameDict is not type dict. type: %s"%(_str_func,type(nameDict))
     
     divider = returnCGMDivider()
     order = returnCGMOrder()
@@ -182,8 +182,10 @@ def returnCombinedNameFromDict(nameDict, stripInvalid = True):
     for item in order:
         buffer = nameDict.get(item)
         buffer = str(SEARCH.get_tagInfoShort(buffer,item))
-        if buffer not in ['False','None','ignore']:
+        if buffer.lower() not in ['false','none','ignore',]:
             nameBuilder.append(buffer)
+        log.debug("|{0}| >>  buffer: {1}".format(_str_func,nameBuilder))
+        
     _str = divider.join(nameBuilder)
     if stripInvalid: _str = strUtils.stripInvalidChars(_str)
     return _str
@@ -204,108 +206,112 @@ def get_objNameDict(obj,ignore=[False]):
     namesDict(string)
     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     """
-    _str_funcName = "returnObjectGeneratedNameDict"
-    log.debug(">>> %s >>> "%(_str_funcName) + "="*75)    
-    #_str_funcName = "returnObjectGeneratedNameDict(%s,ignore = %s)"%(obj,ignore)
-		
-    if type(ignore) is not list:ignore = [ignore]    
-    #typesDictionary = dictionary.initializeDictionary(typesDictionaryFile)
-    #namesDictionary = dictionary.initializeDictionary(namesDictionaryFile)
-    #settingsDictionary = dictionary.initializeDictionary(settingsDictionaryFile)
-    namesDict={}
-    divider = returnCGMDivider()
-    order = returnCGMOrder()
-    nameBuilder = []
-    #>>> Get our cgmVar_iables
-    userAttrs = attributes.returnUserAttributes(obj)
-    cgmAttrs = lists.returnMatchList(userAttrs,order)
-    #>>> Tag ignoring
-    if ignore:
-        for i in ignore:
-            if i in order:
-                order.remove(i)
-
-    #>>> Geting our data
-    for tag in order:
-        tagInfo = SEARCH.get_tagInfo(obj,tag)
-        if tagInfo is not False:
-            namesDict[tag] = (tagInfo)
-            
-    _iterator = ATTR.get(obj,'cgmIterator')
-    if _iterator is not False:
-        log.debug("Iterator found")
-        namesDict['cgmIterator'] = (_iterator)
-            
-    # remove tags up stream that we don't want if they don't exist on the actual object"""
-    if not mc.objExists(obj+'.cgmTypeModifier'):
-        if namesDict.get('cgmTypeModifier') != None:
-            namesDict.pop('cgmTypeModifier')   
-
-    log.debug("%s >>> initial nameDict: %s "%(_str_funcName,namesDict))    
-    
-    #>>> checks if the names exist as objects or it's a shape node
-    ChildNameObj = False
-    nameObj = SEARCH.get_nodeTagInfo(obj,'cgmName')
-    typeTag = SEARCH.get_nodeTagInfo(obj,'cgmType')
-    isType = SEARCH.VALID.get_mayaType(obj)
-    childrenObjects = TRANS.children_get(obj,False)
-    """first see if it's a group """
-    if isType == 'group' and typeTag == False:
-        log.debug("%s >>> group and no typeTag..."%(_str_funcName))            
-        """ if it's a transform group """
-        groupNamesDict = {}
-        if not nameObj:
-            groupNamesDict['cgmName'] = childrenObjects[0]
-        else:
-            groupNamesDict['cgmName'] = nameObj
-        groupNamesDict['cgmType'] = CORESHARE.d_cgmTypes.get('transform')
-        if namesDict.get('cgmTypeModifier') != None:
-            groupNamesDict['cgmTypeModifier'] = namesDict.get('cgmTypeModifier')
-        return groupNamesDict
-        """ see if there's a name tag"""
-    elif nameObj != None or isType == 'shape':
-        #If we have a name object or shape
-        log.debug("%s >>> nameObj not None or isType is 'shape'..."%(_str_funcName))            
+    try:
+        _str_funcName = "get_objNameDict"
+        log.debug(">>> %s >>> "%(_str_funcName) + "="*75)
         
-        if mc.objExists(nameObj) and mc.attributeQuery ('cgmName',node=obj,msg=True):
-            log.debug("%s >>> nameObj exists: '%s'..."%(_str_funcName,nameObj))                        
-            #Basic child object with cgmName tag
-            childNamesDict = {}
-            childNamesDict['cgmName'] = namesDict.get('cgmName')
-            childNamesDict['cgmType'] = namesDict.get('cgmType')
+        if type(ignore) is not list:ignore = [ignore]    
+    
+        namesDict={}
+        divider = returnCGMDivider()
+        order = returnCGMOrder()
+        nameBuilder = []
+        #>>> Get our cgmVar_iables
+        #userAttrs = attributes.returnUserAttributes(obj)
+        #cgmAttrs = lists.returnMatchList(userAttrs,order)
+        #>>> Tag ignoring
+        if ignore:
+            for i in ignore:
+                if i in order:
+                    order.remove(i)
+    
+        #>>> Geting our data
+        for tag in order:
+            tagInfo = SEARCH.get_tagInfo(obj,tag)
+            if tagInfo is not False:
+                namesDict[tag] = (tagInfo)
+                
+        _iterator = ATTR.get(obj,'cgmIterator')
+        if _iterator is not False:
+            log.debug("Iterator found")
+            namesDict['cgmIterator'] = (_iterator)
+                
+        # remove tags up stream that we don't want if they don't exist on the actual object"""
+        if not mc.objExists(obj+'.cgmTypeModifier'):
             if namesDict.get('cgmTypeModifier') != None:
-                childNamesDict['cgmTypeModifier'] = namesDict.get('cgmTypeModifier')
-            if namesDict.get('cgmIterator') != None:
-                childNamesDict['cgmIterator'] = namesDict.get('cgmIterator')            
-            return childNamesDict
-        elif isType == 'shape' or 'Constraint' in isType:
-            """if so, it's a child name object"""
-            log.debug("%s >>> child name object..."%(_str_funcName))                                    
-            childNamesDict = {}
-            childNamesDict['cgmName'] = TRANS.parents_get(obj,False)
-            childNamesDict['cgmType'] = namesDict.get('cgmType')
-            return childNamesDict
-        elif typeTag == 'infoNull':
-            log.debug("%s >>> special case..."%(_str_funcName))                                    
-            moduleObj = search.returnMatchedTagObjectUp(obj,'cgmType','module')
-            masterObj = search.returnMatchedTagObjectUp(obj,'cgmType','master')
-            if moduleObj != False:
-                moduleName = returnUniqueGeneratedName(moduleObj,ignore='cgmType')
-                childNamesDict = {}
-                childNamesDict['cgmName'] = (moduleName+'_'+nameObj)
-                childNamesDict['cgmType'] = namesDict.get('cgmType')
-                return childNamesDict   
-            elif masterObj != False:
-                masterName = returnUniqueGeneratedName(masterObj,ignore='cgmType')
-                childNamesDict = {}
-                childNamesDict['cgmName'] = (masterName+'_'+nameObj)
-                childNamesDict['cgmType'] = namesDict.get('cgmType')
-                return childNamesDict   
+                namesDict.pop('cgmTypeModifier')   
+    
+        log.debug("%s >>> initial nameDict: %s "%(_str_funcName,namesDict))    
+        
+        #>>> checks if the names exist as objects or it's a shape node
+        ChildNameObj = False
+        
+        nameObj = False
+        cgmNameAttrType = ATTR.get_type(obj,'cgmName')
+        log.debug("cgmNameAttrType: {0}".format(cgmNameAttrType))
+        
+        if cgmNameAttrType == 'message':
+            #nameObj = SEARCH.get_nodeTagInfo(obj,'cgmName')
+            nameObj = ATTR.get_message(obj,'cgmName',simple=True)#SEARCH.get_nodeTagInfo(obj,'cgmName')
+            if nameObj:
+                nameObj = nameObj[0]
+                nameObjDict = get_objNameDict(nameObj)
+                for k in 'cgmDirection','test':
+                    if nameObjDict.get(k) and namesDict.get(k):
+                        namesDict.pop(k)
+                log.debug("nameObj: {0}".format(nameObj))
+                namesDict['cgmName'] = nameObj
+                return namesDict
+        
+        typeTag = SEARCH.get_nodeTagInfo(obj,'cgmType')
+        isType = SEARCH.VALID.get_mayaType(obj)
+        isShape = SEARCH.VALID.is_shape(obj)
+        
+        """first see if it's a group """
+        if isType == 'group' and typeTag == False:
+            childrenObjects = TRANS.children_get(obj,False)            
+            log.debug("%s >>> group and no typeTag..."%(_str_funcName))            
+            """ if it's a transform group """
+            groupNamesDict = {}
+            if not nameObj:
+                groupNamesDict['cgmName'] = childrenObjects[0]
             else:
+                groupNamesDict['cgmName'] = nameObj
+            groupNamesDict['cgmType'] = CORESHARE.d_cgmTypes.get('transform')
+            if namesDict.get('cgmTypeModifier') != None:
+                groupNamesDict['cgmTypeModifier'] = namesDict.get('cgmTypeModifier')
+            return groupNamesDict
+            """ see if there's a name tag"""
+        elif isType in ['joint']:
+            return namesDict
+        elif isShape:
+            #If we have a name object or shape
+            log.debug("%s >>> nameObj not None or isType is 'shape'..."%(_str_funcName))            
+            
+            if isShape:
+                #log.debug("%s >>> nameObj exists: '%s'..."%(_str_funcName,nameObj))                        
+                #Basic child object with cgmName tag
+                childNamesDict = {}
+                childNamesDict['cgmName'] = namesDict.get('cgmName')
+                childNamesDict['cgmType'] = namesDict.get('cgmType')
+                if namesDict.get('cgmTypeModifier') != None:
+                    childNamesDict['cgmTypeModifier'] = namesDict.get('cgmTypeModifier')
+                if namesDict.get('cgmIterator') != None:
+                    childNamesDict['cgmIterator'] = namesDict.get('cgmIterator')
+                    
+                return childNamesDict
+            elif isShape or 'Constraint' in isType:
+                """if so, it's a child name object"""
+                log.debug("%s >>> child name object..."%(_str_funcName))                                    
+                childNamesDict = {}
+                childNamesDict['cgmName'] = TRANS.parent_get(obj,False)
+                childNamesDict['cgmType'] = namesDict.get('cgmType')
+                return childNamesDict
+            else:
+                log.debug("%s >>> No special case found. %s"%(_str_funcName,namesDict))                                                
                 return namesDict
         else:
-            log.debug("%s >>> No special case found. %s"%(_str_funcName,namesDict))                                                
             return namesDict
-    else:
-        return namesDict
+    except Exception,err:
+        raise cgmGEN.cgmException(Exception,err,msg=vars())
 returnObjectGeneratedNameDict = get_objNameDict

@@ -10,6 +10,8 @@ Website : http://www.cgmonks.com
 # From Python =============================================================
 import pprint
 import copy
+import math
+
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 import logging
 logging.basicConfig()
@@ -411,6 +413,9 @@ def transform_direction(obj, v):
 
 def convert_aim_vectors_to_different_axis(aim, up, aimAxis="z+", upAxis="y+"):
     try:
+        aim = Vector3.Create( aim )
+        up = Vector3.Create( up )
+
         reload(VALID)
         aim = aim.normalized()
         up = up.normalized()
@@ -598,7 +603,11 @@ def normalizeListToSum(L, normalizeTo=1.0):
     Thanks to:
     http://stackoverflow.com/questions/26785354/normalizing-a-list-of-numbers-in-python
     """
-    return [float(i)/normalizeTo for i in [float(i)/sum(L) for i in L]]
+    
+    #return [float(i)/normalizeTo for i in [float(i)/sum(L) for i in L]]
+    norm = normalizeList(L)
+    normSum = [float(i)/sum(L) for i in L]
+    return [i * normalizeTo for i in normSum]
 
 def get_splitValueList(minU = 0,
                        maxU = 1,
@@ -749,3 +758,43 @@ def average(*args):
     else:
         l = [a for a in args]
     return sum(l)/len(l)
+
+def get_greatest(*args):
+    """ 
+    """
+    if VALID.isListArg(args[0]):
+        l=args[0]
+    else:
+        l = [a for a in args]
+        
+    return max(l)
+
+def median(*args):
+    """ 
+    https://stackoverflow.com/questions/24101524/finding-median-of-list-in-python
+    """
+    if VALID.isListArg(args[0]):
+        l=args[0]
+    else:
+        l = [a for a in args]
+    
+    n = len(l)
+    if n < 1:
+            return None
+    if n % 2 == 1:
+            return sorted(l)[n//2]
+    else:
+            return sum(sorted(l)[n//2-1:n//2+1])/2.0    
+
+def angleBetween(p1, p2, p3):
+    p1 = VALID.euclidVector3Arg(p1)
+    p2 = VALID.euclidVector3Arg(p2)
+    p3 = VALID.euclidVector3Arg(p3)
+    
+    v1 = (p2 - p1).normalized()
+    v2 = (p3 - p2).normalized()
+    
+    return math.degrees(v1.angle(v2))
+
+
+
