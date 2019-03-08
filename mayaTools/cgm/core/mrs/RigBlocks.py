@@ -58,6 +58,10 @@ import cgm.core.mrs.lib.block_utils as BLOCKUTILS
 import cgm.core.mrs.lib.puppet_utils as PUPPETUTILS
 import cgm.core.mrs.lib.module_utils as MODULEUTILS
 import cgm.core.rig.general_utils as RIGGEN
+from cgm.core.classes import GuiFactory as cgmUI
+
+for m in MODULEUTILS,PUPPETUTILS,BLOCKUTILS,BLOCKGEN:
+    reload(m)
 
 #reload(BUILDERUTILS)
 from cgm.core.lib import nameTools
@@ -101,7 +105,7 @@ def get_callSize(mode = None, arg = None, blockType = None, blockProfile = None,
         _str_func = 'get_callSize'
         
         def floatValues(arg):
-            return [float(v) for v in arg]
+            return [float(MATH.Clamp(v,.1,None)) for v in arg]
         _sel = mc.ls(sl=True)
 
         if mode in [None,'default']:
@@ -170,11 +174,13 @@ def get_callSize(mode = None, arg = None, blockType = None, blockProfile = None,
         
         if not size:
             raise ValueError,"No size found"
+        
         _res = floatValues(size)
+        
         log.info("|{0}| >>  mode: {1} | arg: '{2}' | size: {3}".format(_str_func,mode,arg,_res))        
-        return floatValues(_res)
+        return _res
     except Exception,err:
-        cgmGEN.cgmException(Exception,err,msg=vars())
+        cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
 class cgmRigBlock(cgmMeta.cgmControl):
     #These lists should be set up per rigblock as a way to get controls from message links
@@ -208,12 +214,15 @@ class cgmRigBlock(cgmMeta.cgmControl):
         _baseSize = kws.get('baseSize')
         _sizeMode = None
         _postState = None#...for sizeMode call
-        
+        _doVerify = kws.get('doVerify',False)
+        _justCreated = False
+        kw_name = kws.get('name',None)
         
         if node is None:
             _sel = mc.ls(sl=1)            
             _callSize = get_callSize(_size,blockProfile=kws.get('blockProfile'),blockType=blockType)
-
+            _doVerify = True
+            _justCreated = True
             if  _sel:
                 pos_target = TRANS.position_get(_sel[0])
                 log.debug("|{0}| >> pos_target: {1}".format(_str_func,pos_target))                                
@@ -237,11 +246,10 @@ class cgmRigBlock(cgmMeta.cgmControl):
             #if a not in self.UNMANAGED:
                 #self.UNMANAGED.append(a) 	
 
-
+        
         #====================================================================================
         #Keywords - need to set after the super call
         #=====================================================================================         
-        _doVerify = kws.get('doVerify',False) or False
         #self._factory = factory(self.mNode)
         self._callKWS = kws
         self._blockModule = None
@@ -249,18 +257,18 @@ class cgmRigBlock(cgmMeta.cgmControl):
         #self.UNMANAGED.extend(['kw_name','kw_moduleParent','kw_forceNew','kw_initializeOnly','kw_callNameTags'])	
         #>>> Initialization Procedure ================== 
         try:
-            if self.__justCreatedState__ or _doVerify:
+            if _doVerify:
                 if blockType:
                     _blockModule =  get_blockModule(blockType)
                     reload(_blockModule)
+                    self.doStore('blockType',blockType,attrType='string')
                 else:
                     _blockModule = False
                 
-                kw_name = kws.get('name',None)
                 kw_blockProfile = kws.get('blockProfile',None)
                 if self.__justCreatedState__:
                     self.addAttr('blockType', value = blockType,lock=True)
-                    if kw_blockProfile and not kw_name:
+                    if kw_blockProfile and kw_name is None:
                         kw_name = kw_blockProfile
                     elif blockType is not None and not kw_name:
                         kw_name = blockType
@@ -271,20 +279,23 @@ class cgmRigBlock(cgmMeta.cgmControl):
                     self.addAttr('cgmName',attrType='string')
                     if kw_name:
                         self.cgmName = kw_name
-
+                        
+    
                 log.debug("|{0}| >> Just created or do verify...".format(_str_func))            
                 if self.isReferenced():
                     log.error("|{0}| >> Cannot verify referenced nodes".format(_str_func))
                     return
                 elif not self.verify(blockType,side= _side):
                     raise RuntimeError,"|{0}| >> Failed to verify: {1}".format(_str_func,self.mNode)
-
+    
                 #Name -----------------------------------------------
-
+    
                 #On call attrs -------------------------------------------------------------------------
                 for a,v in kws.iteritems():
                     if self.hasAttr(a):
                         try:
+                            if a == 'side' and v == None:
+                                v = 0
                             log.info("|{0}| On call set attr  >> '{1}' | value: {2}".format(_str_func,a,v))
                             ATTR.set(self.mNode,a,v)
                         except Exception,err:
@@ -309,7 +320,7 @@ class cgmRigBlock(cgmMeta.cgmControl):
                 #if _sizeMode:
                     #log.debug("|{0}| >> Sizing: {1}...".format(_str_func, _sizeMode))
                     #self.atUtils('doSize', _sizeMode)
-
+    
                 #Snap with selection mode --------------------------------------
                 if _size in ['selection']:
                     log.info("|{0}| >> Selection mode snap...".format(_str_func))                      
@@ -324,7 +335,7 @@ class cgmRigBlock(cgmMeta.cgmControl):
                 
                 self._blockModule = _blockModule
                 
-                if self.__justCreatedState__:
+                if _justCreated:
                     if _baseSize:
                         log.info("|{0}| >> on call base size: {1}".format(_str_func,_baseSize))
                         self.baseSize = _baseSize
@@ -339,7 +350,9 @@ class cgmRigBlock(cgmMeta.cgmControl):
                         _postState = 'template'
             
                     else:
-                        self.p_blockState = 'template'                
+                        self.p_blockState = 'template'
+            else:log.debug("|{0}| >> No verify...".format(_str_func))
+                
             if blockParent is not None:
                 try:
                     self.p_blockParent = blockParent
@@ -347,13 +360,16 @@ class cgmRigBlock(cgmMeta.cgmControl):
                     log.warning("|{0}| >> blockParent on call failure.".format(_str_func))
                     for arg in err.args:
                         log.error(arg)
-                        
-            #if _sizeMode:
-                #log.debug("|{0}| >> Sizing: {1}...".format(_str_func, _sizeMode))
-                #self.atUtils('doSize', _sizeMode, postState = _postState )                
-            
+                            
+                #if _sizeMode:
+                    #log.debug("|{0}| >> Sizing: {1}...".format(_str_func, _sizeMode))
+                    #self.atUtils('doSize', _sizeMode, postState = _postState )                
+
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            pprint.pprint(vars())
+            log.error("|{0}| >> Failed to initialize properly! ".format(_str_func) + '='*80)
+            
+            #cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
         #self._blockModule = get_blockModule(ATTR.get(self.mNode,'blockType'))        
 
@@ -363,10 +379,12 @@ class cgmRigBlock(cgmMeta.cgmControl):
         """
         try:
             reload(BLOCKSHARE)#...to make sure we get changes
-            reload(self.p_blockModule)
+            try:reload(self.p_blockModule)
+            except:pass
+            
             _str_func = '[{0}] verify'.format(self.p_nameShort)
     
-            _start = time.clock()
+            #_start = time.clock()
     
             if self.isReferenced():
                 raise StandardError,"|{0}| >> Cannot verify referenced nodes".format(_str_func)
@@ -417,24 +435,14 @@ class cgmRigBlock(cgmMeta.cgmControl):
             try:self.baseSize = self._callSize
             except Exception,err:log.debug("|{0}| >> _callSize push fail: {1}.".format(_str_func,err))
     
-            #try:self.atBlockModule('define')
-            #except:pass
-            #_mBlockModule = self.p_blockModule
-            #if 'define' in _mBlockModule.__dict__.keys():
-            #    log.debug("|{0}| >> BlockModule define call found...".format(_str_func))            
-            #    _mBlockModule.define(self)      
-            #self._blockModule = _mBlockModule
-    
             self.doName()
-            log.debug("|{0}| >> Time >> = {1} seconds".format(_str_func, "%0.3f"%(time.clock()-_start)))
+            #log.debug("|{0}| >> Time >> = {1} seconds".format(_str_func, "%0.3f"%(time.clock()-_start)))
             
             if ATTR.get_type(self.mNode,'blockProfile') == 'enum':
                 ATTR.convert_type(self.mNode,'blockProfile','string')
-                #_v = self.getEnumValueString('blockProfile')
-                #self.doStore('blockProfile',_v,attrType='string')
             
             return True
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def doName(self):
         return self.atUtils('doName')
@@ -789,10 +797,10 @@ class cgmRigBlock(cgmMeta.cgmControl):
             if report:cgmGEN.walk_dat(_d,'[{0}] blockDat'.format(self.p_nameShort))
             return _d
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
             
     def saveBlockDat(self):
-        self.blockDat = self.getBlockDat()
+        self.blockDat = self.getBlockDat(False)
 
     def resetBlockDat(self):
         #This needs more work.
@@ -1196,7 +1204,7 @@ class cgmRigBlock(cgmMeta.cgmControl):
                     if childBlock:
                         Block.MirrorBlockPush(childBlock)
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
     @staticmethod
     def MirrorSelectedBlocks( reflectionVector = MATH.Vector3(1,0,0) ):
         '''Mirrors the template positions from the block to the mirrorBlock across the reflection vector transformed from the root block'''
@@ -1255,45 +1263,47 @@ class cgmRigBlock(cgmMeta.cgmControl):
         """
         Function to call a blockModule function by string. For menus and other reasons
         """
-        try:
-            _blockModule = self.p_blockModule
-            return self.stringModuleCall(_blockModule,func,*args, **kws)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        #try:
+        _blockModule = self.p_blockModule
+        return getattr(_blockModule,func)(self,*args,**kws)            
+        #return self.stringModuleCall(_blockModule,func,*args, **kws)
+        #except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     
     def atRigModule(self, func = '', *args,**kws):
         """
         Function to call a blockModule function by string. For menus and other reasons
         """
-        try:
-            _str_func = 'atRigModule'
-            if self.blockType in ['master']:
-                log.debug("|{0}| >> ineligible blockType: {1}".format(_str_func, self.blockType))                 
-                return False
-            
-            return self.moduleTarget.atUtils(func,*args,**kws)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        #try:
+        _str_func = 'atRigModule'
+        if self.blockType in ['master']:
+            log.debug("|{0}| >> ineligible blockType: {1}".format(_str_func, self.blockType))                 
+            return False
+        
+        return self.moduleTarget.atUtils(func,*args,**kws)
+        #except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
     
     def atRigPuppet(self, func = '', *args,**kws):
         """
         Function to call a blockModule function by string. For menus and other reasons
         """
-        try:
-            _str_func = 'atRigPuppet'
-            if self.blockType in ['master']:
-                return self.moduleTarget.atUtils(func,*args,**kws)
-            
-            return self.moduleTarget.modulePuppet.atUtils(func,*args,**kws)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        #try:
+        _str_func = 'atRigPuppet'
+        if self.blockType in ['master']:
+            return self.moduleTarget.atUtils(func,*args,**kws)
+        
+        return self.moduleTarget.modulePuppet.atUtils(func,*args,**kws)
+        #except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
     
     def atBlockUtils(self, func = '', *args,**kws):
         """
         Function to call a blockModule function by string. For menus and other reasons
         """
-        try:
-            reload(BLOCKUTILS)
-            return self.stringModuleCall(BLOCKUTILS,func,*args, **kws)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        #try:
+        reload(BLOCKUTILS)
+        return getattr(BLOCKUTILS,func)(self,*args,**kws)
+        #return self.stringModuleCall(BLOCKUTILS,func,*args, **kws)
+        #except Exception,err:cgmGEN.cgmExceptCB(Exception,err)
         
     atUtils = atBlockUtils
     UTILS = BLOCKUTILS
@@ -1343,12 +1353,12 @@ class cgmRigBlock(cgmMeta.cgmControl):
             for a in err.args:
                 log.error(a)
             log.error(cgmGEN._str_subLine)"""
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         return res
 
         print res
         return res
-
+    @cgmGEN.Timer
     def verify_proxyMesh(self, forceNew = True, puppetMeshMode = False):
         """
         Function to call a blockModule function by string. For menus and other reasons
@@ -1497,7 +1507,7 @@ class handleFactory(object):
             mTar.doName()
             
                 
-    def color(self, target = None, side = None, controlType = None, transparent = None):
+    def color(self, target = None, side = None, controlType = None, transparent = None,shaderOnly =True):
         _str_func = 'handleFactory.color'
         log.debug("|{0}| >> ".format(_str_func)+ '-'*80)
         _targets = VALID.listArg(target)
@@ -1543,11 +1553,12 @@ class handleFactory(object):
                 for s in _shapes:
                     log.debug("|{0}| >> s: {1}".format(_str_func, s))
                     _useType = _controlType
+                    _type = VALID.get_mayaType(s)
                     if controlType is not None:
                         log.debug("|{0}| >> Setting controlType: {1}".format(_str_func, controlType))                                            
                         ATTR.store_info(s,'cgmControlType',controlType)
                         
-                    if transparent is not None and VALID.get_mayaType(s) in ['mesh','nurbsSurface']:
+                    if transparent is not None and _type in ['mesh','nurbsSurface']:
                         log.debug("|{0}| >> Setting transparent: {1}".format(_str_func, transparent))                                                                
                         ATTR.store_info(s,'cgmControlTransparent',transparent)
                         
@@ -1556,7 +1567,11 @@ class handleFactory(object):
                         log.debug("|{0}| >> Shape has cgmControlType tag: {1}".format(_str_func,_useType))                
                     log.debug("|{0}| >> s: {1} | side: {2} | controlType: {3}".format(_str_func, s, _side, _useType))            
                         
-                    CORERIG.colorControl(s,_side,_useType,transparent = _transparent)
+                    if _type in ['mesh','nurbsSurface']:
+                        CORERIG.colorControl(s,_side,_useType,transparent = _transparent, shaderOnly = shaderOnly)
+                    else:
+                        CORERIG.colorControl(s,_side,_useType,transparent = _transparent,shaderOnly=False)
+                        
 
 
     def get_baseDat(self, baseShape = None, baseSize = None, shapeDirection = None):
@@ -1604,7 +1619,7 @@ class handleFactory(object):
         _baseShape = _baseDat[0]
         _baseSize = _baseDat[1]
 
-        if _baseShape not in ['sphere']:
+        if _baseShape not in ['sphere','sphere2','cube','locatorForm']:
             _baseSize = [_baseSize[0],_baseSize[1],None]
 
         if baseShape == 'self':
@@ -1667,6 +1682,8 @@ class handleFactory(object):
                                  'left':'x+',
                                  'right':'x-'}        
             _axisBox = False
+            
+            _baseShape = 'loft' + baseShape[0].capitalize() + ''.join(baseShape[1:])
 
             for a in ['pivotBack','pivotFront','pivotLeft','pivotRight','pivotCenter']:
                 _strPivot = a.split('pivot')[-1]
@@ -1701,7 +1718,7 @@ class handleFactory(object):
                     ml_pivots.append(mPivot)
 
                     if not mPivotRootHandle:
-                        pivotHandle = CURVES.create_controlCurve(mHandle.mNode, shape='squareOpen',
+                        pivotHandle = CURVES.create_controlCurve(mHandle.mNode, shape=_baseShape,
                                                                  direction = upAxis,
                                                                  sizeMode = 'fixed', size = _size * 1.1)
                         mPivotRootHandle = cgmMeta.validateObjArg(pivotHandle,'cgmObject',setClass=True)
@@ -1737,7 +1754,7 @@ class handleFactory(object):
 
             return mPivotRootHandle
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
             
     def addFootHelper(self,baseShape=None, baseSize = None, upAxis = 'y+', setAttrs = {}):
             try:
@@ -1775,11 +1792,12 @@ class handleFactory(object):
                              'center':'ball'}
     
                 mAxis = VALID.simpleAxis(d_pivotDirections['front'])
-                p_ballPush = DIST.get_pos_by_vec_dist(self_pos, mAxis.p_vector,_size/8 )
+                #p_ballPush = DIST.get_pos_by_vec_dist(self_pos, mAxis.p_vector,_size/8 )
                 
+                _baseShape = 'loft' + baseShape[0].capitalize() + ''.join(baseShape[1:])
                 #Main Handle -----------------------------------------------------------------------------
                 pivotHandle = CURVES.create_controlCurve(mHandle.mNode,
-                                                         shape='loftCircle',
+                                                         shape=_baseShape,
                                                          direction = 'y-',
                                                          sizeMode = 'fixed',
                                                          size = _size)
@@ -1899,7 +1917,7 @@ class handleFactory(object):
                     
                     ATTR.set(_loftNode,'degree',1)    
                 
-                    mLoftSurface.doStore('cgmName',self.mBlock.mNode)
+                    mLoftSurface.doStore('cgmName',self.mBlock)
                     mLoftSurface.doStore('cgmType','footApprox')
                     mLoftSurface.doName()
                 
@@ -1953,7 +1971,7 @@ class handleFactory(object):
                 
                 return mPivotRootHandle,mTopLoft
             except Exception,err:
-                cgmGEN.cgmException(Exception,err,msg=vars())
+                cgmGEN.cgmExceptCB(Exception,err,msg=vars())
                 
     def add_lidsHelper(self,upAxis = 'y+', setAttrs = {}):
         try:
@@ -2123,7 +2141,7 @@ class handleFactory(object):
 
             return mLidHandle
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def addScalePivotHelper(self,baseShape=None, baseSize = None, shapeDirection = 'z+', setAttrs = {}):
         _baseDat = self.get_baseDat(baseShape,baseSize)
@@ -2284,7 +2302,7 @@ class handleFactory(object):
             
             return mTrans
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def setAttrs_fromDict(self, setAttrs={}):
         try:
@@ -2294,7 +2312,7 @@ class handleFactory(object):
             for a,v in setAttrs.iteritems():
                 ATTR.set(_short, a, v)
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def addOrientHelper(self,baseShape=None, baseSize = None, shapeDirection = 'z-', setAttrs = {}):
         try:
@@ -2333,7 +2351,7 @@ class handleFactory(object):
 
             return mCurve
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def addProxyHelper(self,baseShape=None, baseSize = None, shapeDirection = 'z+', setAttrs = {}):
         try:
@@ -2377,7 +2395,7 @@ class handleFactory(object):
 
             return mProxy
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def addRootMotionHelper(self,baseShape='pivotLocator', baseSize = None, shapeDirection = 'z+'):
         try:
@@ -2417,7 +2435,7 @@ class handleFactory(object):
             self.mBlock.msgList_append('prerigHandles',mCurve.mNode)
             return mCurve
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def addJointLabel(self,mHandle = None, label = None):
         _bfr = mHandle.getMessage('jointLabel')
@@ -2439,7 +2457,7 @@ class handleFactory(object):
         mJointLabel.drawLabel = 1
         mJointLabel.otherType = label
     
-        mJointLabel.doStore('cgmName',mHandle.mNode)
+        mJointLabel.doStore('cgmName',mHandle)
         mJointLabel.doStore('cgmType','jointLabel')
         mJointLabel.doName()
     
@@ -2493,7 +2511,7 @@ class handleFactory(object):
 
             if loftHelper:#...loft curve -------------------------------------------------------------------------------------
                 mLoft = self.buildBaseShape('square',_size*.5,'z+')
-                mLoft.doStore('cgmName',mJointCurve.mNode)
+                mLoft.doStore('cgmName',mJointCurve)
                 mLoft.doStore('cgmType','loftCurve')
                 mLoft.doName()
                 mLoft.p_parent = mJointCurve
@@ -2506,7 +2524,7 @@ class handleFactory(object):
 
             return mJointCurve
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def rebuildAsLoftTarget(self, baseShape = None, baseSize = None, shapeDirection = 'z+', rebuildHandle = True):
         _baseDat = self.get_baseDat(baseShape,baseSize)
@@ -2540,7 +2558,7 @@ class handleFactory(object):
 
             #>>>make our loft curve
             mCrv = self.buildBaseShape(_baseShape,_baseSize,shapeDirection)
-            mCrv.doStore('cgmName',self._mTransform.mNode)
+            mCrv.doStore('cgmName',self._mTransform)
             mCrv.doStore('cgmType','loftCurve')
             mCrv.doName()
             mCrv.p_parent = self._mTransform
@@ -2587,7 +2605,7 @@ class handleFactory(object):
 
             #>>>make our loft curve
             mCrv = mBaseCrv
-            mCrv.doStore('cgmName',self._mTransform.mNode)
+            mCrv.doStore('cgmName',self._mTransform)
             mCrv.doStore('cgmType','loftCurve')
             mCrv.doName()
             mCrv.p_parent = self._mTransform
@@ -2744,7 +2762,7 @@ class cgmRigBlockHandle(cgmMeta.cgmControl):
 
         #>>>make our loft curve
         mCrv = self.buildBaseShape(_baseShape,_baseSize,shapeDirection)
-        mCrv.doStore('cgmName',self.mNode)
+        mCrv.doStore('cgmName',self)
         mCrv.doStore('cgmType','loftCurve')
         mCrv.doName()
         mCrv.p_parent = self
@@ -3123,7 +3141,7 @@ class factory(object):
                         _mBlock.addAttr(a,initialValue = v, attrType = t,lock=_l, keyable = False)            
             except Exception,err:
                 log.error("|{0}| Add attr Failure >> '{1}' | defaultValue: {2} ".format(_str_func,a,v,blockType)) 
-                cgmGEN.cgmException(Exception,err,msg=vars())
+                cgmGEN.cgmExceptCB(Exception,err,msg=vars())
                 if not forceReset:                
                     raise Exception,err
 
@@ -3924,7 +3942,7 @@ def get_modules_dat(update = False):
                                 #_l_unbuildable.append(name)
                         except Exception, e:
                             log.warning("|{0}| >> Module failed: {1}".format(_str_func,key))                               
-                            cgmGEN.cgmException(Exception,e,msg=vars())
+                            cgmGEN.cgmExceptCB(Exception,e,msg=vars())
 
                     else:
                         _l_duplicates.append("{0} >> {1} ".format(key, os.path.join(root,f)))
@@ -4203,6 +4221,11 @@ def contextual_rigBlock_method_call(mBlock, context = 'self', func = 'getShortNa
 
     if not args:
         args = []
+        
+    _progressBar = None
+    if kws:
+        if kws.get('progressBar'):
+            _progressBar = kws.pop('progressBar')
 
     if not kws:
         kws = {}
@@ -4221,33 +4244,46 @@ def contextual_rigBlock_method_call(mBlock, context = 'self', func = 'getShortNa
         mc.select([mBlock.mNode for mBlock in _l_context])
         return
     
-
-    for mBlock in _l_context:
-        try:
-            _short = mBlock.getShortName()            
-            log.debug("|{0}| >> On: {1}".format(_str_func,_short))            
-            res = getattr(mBlock,func)(*args,**kws) or None
-            print("|{0}| >> {1}.{2}({3},{4})".format(_str_func,_short,func,','.join(a for a in args),
-                                                           _kwString,))
-            if res not in [True,None,False]:print(res)
-            _res.append(res)
-        except Exception,err:
-            log.error(cgmGEN._str_hardLine)
-            log.error("|{0}| >> Failure: {1}".format(_str_func, err.__class__))
-            log.error("block: {0} | func: {1}".format(_short,func))            
-            if args:
-                log.error("Args...")
-                for a in args:
-                    log.error("      {0}".format(a))
-            if kws:
-                log.error(" KWS...".format(_str_func))
-                for k,v in kws.iteritems():
-                    log.error("      {0} : {1}".format(k,v))   
-            log.error("Errors...")
-            for a in err.args:
-                log.error(a)
-            _res.append('ERROR')
-            log.error(cgmGEN._str_subLine)
+    if _progressBar:
+        print 'progressBar !!!! | {0}'.format(_progressBar)
+        int_len = len(_l_context)
+        
+    try:
+        for i,mBlock in enumerate(_l_context):
+            try:
+                _short = mBlock.getShortName()
+                if _progressBar:
+                    cgmUI.progressBar_start(_progressBar)
+                    cgmUI.progressBar_set(_progressBar,
+                                          maxValue = int_len,beginProgress=True,
+                                          progress=i, vis=True)                
+                log.debug("|{0}| >> On: {1}".format(_str_func,_short))
+                res = getattr(mBlock,func)(*args,**kws) or None
+                print("|{0}| >> {1}.{2}({3},{4})".format(_str_func,_short,func,','.join(str(a) for a in args),
+                                                               _kwString,))
+                if res not in [True,None,False]:print(res)
+                _res.append(res)
+            except Exception,err:
+                raise Exception,err
+                cgmGEN.cgmExceptCB(Exception,err)
+                log.error(cgmGEN._str_hardLine)
+                log.error("|{0}| >> Failure: {1}".format(_str_func, err.__class__))
+                log.error("block: {0} | func: {1} | context: {2}".format(_short,func,context))            
+                if args:
+                    log.error("Args...")
+                    for a in args:
+                        log.error("      {0}".format(a))
+                if kws:
+                    log.error(" KWS...".format(_str_func))
+                    for k,v in kws.iteritems():
+                        log.error("      {0} : {1}".format(k,v))   
+                log.error("Errors...")
+                for a in err.args:
+                    log.error(a)
+                _res.append('ERROR')
+                log.error(cgmGEN._str_subLine)
+    finally:
+        if _progressBar:cgmUI.progressBar_end(_progressBar)
     return _res
 
 def contextual_module_method_call(mBlock, context = 'self', func = 'getShortName',*args,**kws):
@@ -4299,7 +4335,7 @@ def contextual_module_method_call(mBlock, context = 'self', func = 'getShortName
             log.debug("|{0}| >> On: {1}".format(_str_func,_short))
             mModule = mBlock.UTILS.get_module(mBlock)
             res = getattr(mModule,func)(*args,**kws) or None
-            print("|{0}| >> {1}.{2}({3},{4}) = {5}".format(_str_func,_short,func,','.join(a for a in args),_kwString, res))                        
+            print("|{0}| >> {1}.{2}({3},{4}) = {5}".format(_str_func,_short,func,','.join(str(a) for a in args),_kwString, res))                        
             _res.append(res)
         except Exception,err:
             log.error(cgmGEN._str_hardLine)
@@ -4322,7 +4358,7 @@ def contextual_module_method_call(mBlock, context = 'self', func = 'getShortName
 
 class rigFactory(object):
     #@cgmGEN.Timer    
-    def __init__(self, rigBlock = None, forceNew = True, autoBuild = False, ignoreRigCheck = False,
+    def __init__(self, rigBlock = None, forceNew = True, autoBuild = False, ignoreRigCheck = False,mode=None,
                  *a,**kws):
         """
         Core rig block builder factory
@@ -4354,38 +4390,42 @@ class rigFactory(object):
             self.call_kws = kws
             #log.debug("|{0}| >> kws: {1}".format(_str_func,kws))
 
-
         self.call_kws['forceNew'] = forceNew
         self.call_kws['rigBlock'] = rigBlock
         self.call_kws['autoBuild'] = autoBuild
         self.call_kws['ignoreRigCheck'] = ignoreRigCheck
         
+        self.mBlock = cgmMeta.validateObjArg(self.call_kws['rigBlock'],'cgmRigBlock',noneValid=False)
+        
         #cgmGEN.log_info_dict(self.call_kws,_str_func)
-        
-        self.fnc_get_nodeSnapShot()
-        
-        self.fnc_check_rigBlock()
+        _buildModule = rigBlock.p_blockModule
+        reload(_buildModule)
+        _short = self.mBlock.p_nameShort
+        if _buildModule.__dict__.get('rig_prechecks'):
+            log.debug("|{0}| >> Found precheck call".format(_str_func,))
+            _buildModule.rig_prechecks(self)        
         
         if self.l_precheckErrors:
             _short = self.mBlock.mNode
             print(cgmGEN._str_hardLine)
-            print("|{0}| >> Block: {1} ".format(_str_func, self.d_block['shortName']))            
+            print("|{0}| >> Block: {1} ".format(_str_func, _short))            
             print("|{0}| >> Prechecks failed! ".format(_str_func))
             for i,e in enumerate(self.l_precheckErrors):
                 print("{0} | {1}".format(i,e))
             print(cgmGEN._str_hardLine)
             #log.error("[ '{0}' ] Failure. See script editor".format(_short))
+            return log.error("[ '{0}' ] Failure. See script editor".format(_short))
             raise ValueError,("[ '{0}' ] Failure. See script editor".format(_short))
         
-        if self.l_precheckWarnings:
-            print(cgmGEN._str_hardLine)
-            print("|{0}| >> Block: {1} ".format(_str_func, self.d_block['shortName']))            
-            print("|{0}| >> Prechecks Warnings! ".format(_str_func))
-            for i,e in enumerate(self.l_precheckWarnings):
-                print("{0} | {1}".format(i,e))
-            print(cgmGEN._str_hardLine)            
+
         #except Exception,err:cgmGEN.cgmExceptCB(Exception,err)
         
+        if mode == 'prechecks':
+            print(cgmGEN.logString_start("[ {0} ] || PRECHECK PASSED".format(self.mBlock.p_nameShort)))
+            return
+        
+        self.fnc_check_rigBlock()
+        self.fnc_get_nodeSnapShot()
         self.fnc_check_module()
         if not self.fnc_rigNeed():
             log.error('No rig need detected. Check settings. self: {0}'.format(self))
@@ -4397,11 +4437,19 @@ class rigFactory(object):
             raise RuntimeError,"|{0}| >> Failed to process module rig Checks. See warnings and errors.".format(_str_func)
 
         self.fnc_deformConstrainNulls()
+        
+        if self.l_precheckWarnings:
+            print(cgmGEN._str_hardLine)
+            print("|{0}| >> Block: {1} ".format(_str_func, _short))            
+            print("|{0}| >> Prechecks Warnings! ".format(_str_func))
+            for i,e in enumerate(self.l_precheckWarnings):
+                print("{0} | {1}".format(i,e))
+            print(cgmGEN._str_hardLine)                            
         self.fnc_processBuild(**kws)
         
 
-
-        log.info("|{0}| >> Time >> = {1} seconds".format(_str_func, "%0.3f"%(time.clock()-_start)))                
+        log.info("|{0}| >> Time >> = {1} seconds".format(_str_func, "%0.3f"%(time.clock()-_start)))
+        
 
         #_verify = kws.get('verify',False)
         #log.debug("|{0}| >> verify: {1}".format(_str_func,_verify))
@@ -4424,8 +4472,12 @@ class rigFactory(object):
         """
         try:reload(BUILDERUTILS)
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
-        return cgmGEN.stringModuleClassCall(self, BUILDERUTILS, func, *args, **kws)
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
+            
+        return getattr(BUILDERUTILS,func)(self,*args,**kws)
+        
+        #return cgmGEN.stringModuleClassCall(self, BUILDERUTILS, func, *args, **kws)
+    
     atUtils = atBuilderUtils
     UTILS = BUILDERUTILS
     def fnc_connect_toRigGutsVis(self, ml_objects, vis = True, doShapes = False):
@@ -4446,13 +4498,15 @@ class rigFactory(object):
 
     @cgmGEN.Timer
     def fnc_get_nodeSnapShot(self):
-        #self.ml_preNodesBuffer = RIGGEN.get_metaNodeSnapShot()#cgmMeta.asMeta(SEARCH.get_nodeSnapShot())
-        self.l_preNodesBuffer = SEARCH.get_nodeSnapShot()
-        
+        #self.ml_preNodesBuffer = RIGGEN.get_nodeSnapShot(1)#cgmMeta.asMeta(SEARCH.get_nodeSnapShot())
+        self.l_preNodesBuffer,self.l_preNodesUUIDs = SEARCH.get_nodeSnapShot(uuid=True)
+        #self.l_preNodesUUIDs = SEARCH.get_nodeSnapShot(uuid=True)
     def fnc_check_rigBlock(self):
         """
         Check the rig block data 
         """
+        if self.l_precheckErrors:
+            return False        
         _str_func = 'fnc_check_rigBlock' 
         _d = {}
         self.d_block = _d    
@@ -4463,9 +4517,9 @@ class rigFactory(object):
             raise RuntimeError,'No rigBlock stored in call kws'
 
         #BlockFactory = factory(self.call_kws['rigBlock'])
-        mBlock = cgmMeta.validateObjArg(self.call_kws['rigBlock'],'cgmRigBlock')
-        
+        mBlock = self.mBlock
         mBlock.verify()
+        
         _d['mBlock'] = mBlock
         self.mBlock = mBlock
         #_d['mFactory'] = BlockFactory
@@ -4474,13 +4528,13 @@ class rigFactory(object):
         _blockType = _d['mBlock'].blockType
 
         _buildModule = get_blockModule(_blockType)
+        """
         reload(_buildModule)
         if _buildModule.__dict__.get('rig_prechecks'):
             log.debug("|{0}| >> Found precheck call".format(_str_func,))
             
-            _buildModule.rig_prechecks(self)
-            if self.l_precheckErrors:
-                return False
+            _buildModule.rig_prechecks(self)"""
+
         
 
         if not _buildModule:
@@ -4488,8 +4542,8 @@ class rigFactory(object):
             return False
         _d['buildModule'] =  _buildModule   #if not is_buildable
         _d['buildVersion'] = _buildModule.__version__
-
         _d['blockParents'] = mBlock.getBlockParents()
+        _d['b_faceBlock'] = _buildModule.__dict__.get('__faceBlock__',False)
 
         #Build order --------------------------------------------------------------------------------
         _d['buildOrder'] = valid_blockModule_rigBuildOrder(_buildModule)
@@ -4618,6 +4672,23 @@ class rigFactory(object):
 
         #>>> Object Set -----------------------------------------------------------------------------------
         self.mModule.verify_objectSet()
+        
+        if self.d_block['b_faceBlock']:
+            mFaceSet = self.mModule.atUtils('verify_faceObjectSet')
+            self.mFaceSet = mFaceSet
+            
+            #Settings =============================================================================
+            mModuleParent =  self.d_module['mModuleParent']
+            if mModuleParent:
+                mSettings = mModuleParent.rigNull.settings
+            else:
+                log.debug("|{0}| >>  using puppet...".format(_str_func))
+                mSettings = self.d_module['mMasterControl'].controlVis
+                
+            log.debug("|{0}| >> mModuleParent mSettings: {1}".format(_str_func,mSettings))
+            self.mPlug_visSub_moduleParent = cgmMeta.cgmAttr(mSettings,'visSub')
+            self.mPlug_visDirect_moduleParent = cgmMeta.cgmAttr(mSettings,'visDirect')
+
 
         log.debug("|{0}| >> passed...".format(_str_func)+ cgmGEN._str_subLine)
         return _res
@@ -4713,7 +4784,7 @@ class rigFactory(object):
             log.error("Errors...")
             for a in err.args:
                 log.error(a)
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
             #cgmGEN.log_info_dict(self.__dict__,'rigFactory')
 
@@ -4723,7 +4794,8 @@ class rigFactory(object):
     #@cgmGEN.Timer
     def log_self(self):
         _d = copy.copy(self.__dict__)
-        _d.pop('l_preNodesBuffer')
+        for k in ['l_preNodesBuffer','l_preNodesUUIDs']:
+            _d.pop(k)
         pprint.pprint(_d)
 
     #@cgmGEN.Timer
@@ -4789,7 +4861,7 @@ class rigFactory(object):
             if _mModule:
                 _d['ml_moduleJoints'] = _mRigNull.msgList_get('moduleJoints',cull=True)
                 if not _d['ml_moduleJoints']:
-                    log.warning("|{0}| >> No module joints found".format(_str_func))
+                    self.l_precheckErrors.append("No module joints found")
                     _d['ml_skinJoints'] = False
                 else:
                     _d['l_moduleJoints'] = []
@@ -4828,7 +4900,7 @@ class rigFactory(object):
 
             return True
         except Exception,err:
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
             raise Exception,err
 
 
@@ -4852,45 +4924,31 @@ class rigFactory(object):
         _mMasterSettings = self.d_module['mMasterSettings']
         _mi_moduleParent = self.d_module['mModuleParent']
         _ml_skinJoints = self.d_joints['ml_skinJoints']
+        
+        _attachPoint = ATTR.get_enumValueString(self.mBlock.mNode,'attachPoint')        
+        self.attachPoint = self.mModule.atUtils('get_driverPoint',_attachPoint )        
 
         if not self.mModule.getMessage('deformNull'):
-            if _str_partType in ['eyebrow', 'mouthnose']:
-                raise ValueError,"not implemented"
-                """
-                #Make it and link it ------------------------------------------------------
-                buffer = rigging.groupMeObject(self.str_faceAttachJoint,False)
-                mGrp = cgmMeta.asMeta(buffer,'cgmObject',setClass=True)
-                mGrp.addAttr('cgmName',self.partName,lock=True)
-                mGrp.addAttr('cgmTypeModifier','deform',lock=True)	 
-                mGrp.doName()
-                mGrp.parent = self.i_faceDeformNull	
-                self.mModule.connectChildNode(mGrp,'deformNull','module')
+            if self.d_block['b_faceBlock']:
+                log.debug("|{0}| >> Face deformNull".format(_str_func))
+                mGrp = self.attachPoint.doCreateAt(setClass=True)
                 self.mModule.connectChildNode(mGrp,'constrainNull','module')
-                self.i_deformNull = mGrp#link"""
+                mGrp.parent = self.attachPoint
             else:
                 #Make it and link it
-                if _str_partType in ['eyelids']:
-                    buffer =  CORERIG.group_me(_mi_moduleParent.deformNull.mNode,False)
-                else:
-                    buffer =  CORERIG.group_me(_ml_skinJoints[0].mNode,False)
-
+                buffer =  CORERIG.group_me(_ml_skinJoints[0].mNode,False)
                 mGrp = cgmMeta.asMeta(buffer,'cgmObject',setClass=True)
-                mGrp.addAttr('cgmName',_str_partName,lock=True)
-                mGrp.addAttr('cgmTypeModifier','deform',lock=True)	 
-                mGrp.doName()
                 mGrp.parent = self.d_module['mMasterDeformGroup'].mNode
-                self.mModule.connectChildNode(mGrp,'deformNull','module')
-                if _str_partType in ['eyeball']:
-                    self.mModule.connectChildNode(mGrp,'constrainNull','module')
-                    mGrp.parent = self.i_faceDeformNull
+                
+            mGrp.addAttr('cgmName',_str_partName,lock=True)
+            mGrp.addAttr('cgmTypeModifier','deform',lock=True)	 
+            mGrp.doName()
+            self.mModule.connectChildNode(mGrp,'deformNull','module')
                     
         self.mDeformNull = self.mModule.deformNull
-        _attachPoint = ATTR.get_enumValueString(self.mBlock.mNode,'attachPoint')        
-        self.attachPoint = self.mModule.atUtils('get_driverPoint',_attachPoint )
+
         
-        if not self.mModule.getMessage('constrainNull'):
-            #if _str_partType not in __l_faceModules__ or _str_partType in ['eyelids']:
-                #Make it and link it
+        if not self.mModule.getMessage('constrainNull') and self.d_block['b_faceBlock'] is not True:
             buffer =  CORERIG.group_me(self.mDeformNull.mNode,False)
             mGrp = cgmMeta.asMeta(buffer,'cgmObject',setClass=True)
             mGrp.addAttr('cgmName',_str_partName,lock=True)
@@ -4950,8 +5008,6 @@ class rigFactory(object):
                                 maintainOffset = True, weight = 1)
             #mc.scaleConstraint([mAttach.mNode], self.mConstrainNull.mNode, maintainOffset = True, weight = 1)
             """
-        
-        
 
         #>> Roll joint check...
         self.b_noRollMode = False
@@ -4976,14 +5032,14 @@ class rigFactory(object):
 
         if self.b_outOfDate and self.call_kws['autoBuild']:
             self.doBuild(**kws)
-        else:log.error("|{0}| >> No autobuild condition met. Out of date: {1}".format(_str_func, self.b_outOfDate))                    
-
-
+        else:log.error("|{0}| >> No autobuild condition met. Out of date: {1}".format(_str_func, self.b_outOfDate))
+        
         log.debug("|{0}| >> Time >> = {1} seconds".format(_str_func, "%0.3f"%(time.clock()-_start)))            
 
     def doBuild(self,buildTo = '',**kws):
         _str_func = 'doBuild'  
-        _start = time.clock()        
+        _start = time.clock()
+        
 
         try:
             _l_buildOrder = self.d_block['buildModule'].__dict__.get('__l_rigBuildOrder__')
@@ -4998,34 +5054,45 @@ class rigFactory(object):
             mayaMainProgressBar = CGMUI.doStartMayaProgressBar(_len)
 
             for i,fnc in enumerate(_l_buildOrder):
-                #str_name = d_build[k].get('name','noName')
-                #func_current = d_build[k].get('function')
-                #_str_subFunc = str_name
-                #_str_subFunc = fnc.__name__
                 _str_func = '_'.join(fnc.split('_')[1:])
+                
                 mc.progressBar(mayaMainProgressBar, edit=True,
-                               status = "|{0}| >>Rig>> step: {1}...".format(self.d_block['shortName'],fnc), progress=i+1)    
-
-                getattr(self.d_block['buildModule'],fnc)(self)
-
-                if buildTo is not None:
-                    _Break = False
-                    if VALID.stringArg(buildTo):
-                        if buildTo == fnc:
+                               status = "|{0}| >>Rig>> step: {1}...".format(self.d_block['shortName'],fnc), progress=i+1)                    
+                
+                mc.undoInfo(openChunk=True,chunkName=fnc)
+                
+                
+                err=None
+                try:
+                    getattr(self.d_block['buildModule'],fnc)(self)            
+                except Exception,err:
+                    log.error(err)
+            
+                finally:
+                    mc.undoInfo(closeChunk=True)            
+                    if err is not None:
+                        cgmGEN.cgmExceptCB(Exception,err,localDat=vars())                        
+                
+                
+                    if buildTo is not None:
+                        _Break = False
+                        if VALID.stringArg(buildTo):
+                            if buildTo == fnc:
+                                _Break = True
+                        elif buildTo == i:
                             _Break = True
-                    elif buildTo == i:
-                        _Break = True
-
-                    if _Break:
-                        log.debug("|{0}| >> Stopped at step: [{1}]".format(_str_func, _str_subFunc))   
-                        break
+                
+                        if _Break:
+                            log.debug("|{0}| >> Stopped at step: [{1}]".format(_str_func, _str_subFunc))   
+                            break                                
+                
                     
             #self.mBlock.addAttr('rigNodeBuffer','message',l_diff)
             
             CGMUI.doEndMayaProgressBar(mayaMainProgressBar)#Close out this progress bar    
         except Exception,err:
             CGMUI.doEndMayaProgressBar()#Close out this progress bar
-            cgmGEN.cgmException(Exception,err,msg=vars())
+            cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
             raise Exception,"|{0}| >> err: {1}".format(_str_func,err)
 
@@ -5108,7 +5175,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
                     return
                 elif not self.__verify__(name = name,**kws):
                     raise RuntimeError,"|{0}| >> Failed to verify: {1}".format(_str_func,self.mNode)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     #====================================================================================
     def __verify__(self,name = None,**kws):
@@ -5187,13 +5254,15 @@ class cgmRigPuppet(cgmMeta.cgmNode):
             self.atUtils('groups_verify')
             
             return True
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     def atUtils(self, func = '', *args,**kws):
         """
         Function to call a blockModule function by string. For menus and other reasons
         """
-        return self.stringModuleCall(PUPPETUTILS,func,*args, **kws)
+        reload(PUPPETUTILS)
+        return getattr(PUPPETUTILS,func)(self,*args,**kws)            
+        #return self.stringModuleCall(PUPPETUTILS,func,*args, **kws)
 
     def changeName(self,name = None):
         try:
@@ -5213,7 +5282,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
                 
             #self.masterNull.displayLayer.doName()
 
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     def doName(self):
         try:
@@ -5241,7 +5310,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
             
             try:self.displayLayer.doName()
             except:pass
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
 
     def verify_masterNull(self,**kws):
@@ -5280,7 +5349,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
 
             
             return True
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     #=================================================================================================
     # Puppet Utilities
@@ -5325,7 +5394,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
                     mGroup.addAttr('cgmAlias','world')
                 elif attr == 'puppetSpaceObjects':
                     mGroup.addAttr('cgmAlias','puppet')
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
 
     def verify_objectSet(self):
@@ -5343,7 +5412,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
                 mSet.connectParentNode(self.mNode,'puppet','puppetSet')
             #ATTR.copy_to(self.mNode,'cgmName',mSet.mNode,'cgmName',driven = 'target')
             mSet.rename('animSet')
-        except Exception,err:cgmGEN.cgmException(Exception,err)"""
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err)"""
         
     def rig_connect(self):
         return self.UTILS.rig_connect(self)
@@ -5367,7 +5436,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
             mc.delete(self.masterNull.mNode)
             mc.delete(self.mNode)
             #del(self)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     #=================================================================================================
     # Modules
@@ -5397,6 +5466,8 @@ class cgmRigPuppet(cgmMeta.cgmNode):
             log.debug("|{0}| >> ...".format(_str_func)+ '-'*80)
             
             self.UTILS.groups_verify(self)
+            self.UTILS.layer_verify(self)
+            
             #self.verify_groups()#...make sure everythign is there
             
             # Size...
@@ -5559,7 +5630,7 @@ class cgmRigPuppet(cgmMeta.cgmNode):
             
             
             return True
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
     
 class cgmRigMaster(cgmMeta.cgmObject):
     """
@@ -5591,7 +5662,7 @@ class cgmRigMaster(cgmMeta.cgmObject):
             if self.__justCreatedState__ or doVerify:
                 if not self.__verify__(*args,**kws):
                     raise StandardError,"Failed to verify!"	
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def __verify__(self,*args,**kws):
         try:
@@ -5625,7 +5696,7 @@ class cgmRigMaster(cgmMeta.cgmObject):
             #Connect and Lock the scale stuff------------------------------------
             self.setAttrFlags(attrs=['sx','sz'])
             self.doConnectOut('sy',['sx','sz'])
-            ATTR.set_alias(_short,'sy','blockScale')            
+            ATTR.set_alias(_short,'sy','rigScale')
             
             
             #=====================================================================
@@ -5638,7 +5709,7 @@ class cgmRigMaster(cgmMeta.cgmObject):
             self.doName()
             return True
         
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
 
     def rebuildMasterShapes(self,**kws):
         """
@@ -5765,7 +5836,7 @@ class cgmRigMaster(cgmMeta.cgmObject):
                 mShape.doName()
             return True
         
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     def rebuildControlCurveBAK(self,**kws):
         """
@@ -5824,7 +5895,7 @@ class cgmRigMaster(cgmMeta.cgmObject):
     
     
             self.doName()    
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     def getBlockModule(self,update = False):
         if self._blockModule and not update:
@@ -5905,7 +5976,7 @@ class cgmRigModule(cgmMeta.cgmObject):
                     raise StandardError,"Failed to verify!"
                 
                 
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     def doName(self):
         return self.atUtils('doName')
@@ -5916,8 +5987,10 @@ class cgmRigModule(cgmMeta.cgmObject):
         """
         try:
             reload(MODULEUTILS)
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
-        return self.stringModuleCall(MODULEUTILS,func,*args, **kws)
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
+        return getattr(MODULEUTILS,func)(self,*args,**kws)            
+        
+        #return self.stringModuleCall(MODULEUTILS,func,*args, **kws)
     UTILS = MODULEUTILS
     
     def __verify__(self,**kws):
@@ -6054,7 +6127,7 @@ class cgmRigModule(cgmMeta.cgmObject):
  
             self.doName()  
             return True
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
         
     def get_allModuleChildren(self,*args,**kws):
         return MODULEUTILS.moduleChildren_get(self,*args,**kws)
@@ -6085,8 +6158,10 @@ class cgmRigModule(cgmMeta.cgmObject):
         """
         try:
             reload(self.getBlockModule())
-        except Exception,err:cgmGEN.cgmException(Exception,err,msg=vars())
-        return self.stringModuleCall(self._blockModule,func,*args, **kws)    
+        except Exception,err:cgmGEN.cgmExceptCB(Exception,err,msg=vars())
+        return getattr(self._blockModule,func)(self,*args,**kws)            
+        
+        #return self.stringModuleCall(self._blockModule,func,*args, **kws)    
     
     
     def rig_reset(self):
@@ -6115,7 +6190,7 @@ def get_blockProfile_options(arg):
         return []
         
     except Exception,err:
-        cgmGEN.cgmException(Exception,err)
+        cgmGEN.cgmExceptCB(Exception,err)
         
 #=========================================================================      
 # R9 Stuff - We force the update on the Red9 internal registry  

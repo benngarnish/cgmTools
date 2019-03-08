@@ -46,7 +46,7 @@ reload(SDK)
 import cgm.core.tools.lib.tool_calls as TOOLCALLS
 reload(TOOLCALLS)
 import cgm.core.classes.GuiFactory as cgmUI
-
+import cgm.projects.CGM as CGMPROJECTS
 from cgm.core.tools import attrTools as ATTRTOOLS
 reload(ATTRTOOLS)
 
@@ -61,6 +61,8 @@ from cgm.core.classes import HotkeyFactory as HKEY
 from cgm.core.tools.lib import snap_calls as UISNAPCALLS
 reload(UISNAPCALLS)
 import cgm.core.lib.arrange_utils as ARRANGE
+import cgm.core.tools.lightLoomLite as LIGHTLOOMLITE
+reload(LIGHTLOOMLITE)
 import cgm.core.rig.joint_utils as JOINTS
 from cgm.core.lib.ml_tools import (ml_breakdownDragger,
                                    ml_breakdown,
@@ -98,11 +100,11 @@ def uiSection_help(parent):
     mc.menuItem(parent = parent,
                 l='Report issue',
                 ann = "Load a browser page to report a bug",
-                c=lambda *a: webbrowser.open("https://bitbucket.org/jjburton/cgmtools/issues/new"))    
+                c=lambda *a: webbrowser.open("https://github.com/jjburton/cgmTools/issues/new"))    
     mc.menuItem(parent = parent,
                 l='Get Builds',
                 ann = "Get the latest builds of cgmTools from bitBucket",
-                c=lambda *a: webbrowser.open("https://bitbucket.org/jjburton/cgmtools/downloads/?tab=branches")) 
+                c=lambda *a: webbrowser.open("https://github.com/jjburton/cgmTools")) 
     _vids = mc.menuItem(parent = parent,subMenu = True,
                         l='Videos')
     
@@ -152,15 +154,57 @@ def uiSection_arrange(parent = None, selection = None, pairSelected = True):
     _arrange= mc.menuItem(parent=parent,subMenu = True,
                           l = 'Arrange',
                           ann = "Ordered layout of selected items")    
-    mc.menuItem(parent=_arrange,
-                l = 'Along line - Even',
-                c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{}),                                               
-                ann = "Layout on line from first to last item evenly")    
-    mc.menuItem(parent=_arrange,
-                l = 'Along line - Spaced',
-                c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'spaced'}),                                               
-                ann = "Layout on line from first to last item closest as possible to original position")   
     
+    mc.menuItem(parent=_arrange,
+              l = 'Linear[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('linearEven'))
+    mc.menuItem(parent=_arrange,
+                l = 'Linear[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'spaced'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('linearSpaced'))
+    
+    #mUI.MelMenuItemDiv(_arrange)        
+
+    mc.menuItem(parent=_arrange,
+              l = 'Curve[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'even','curve':'cubic'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicEven'))
+    mc.menuItem(parent=_arrange,
+              l = 'Arc[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'even','curve':'cubicArc'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicArcEven'))
+    mc.menuItem(parent=_arrange,
+              l = 'Arc[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'spaced','curve':'cubicArc'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicArcSpaced'))    
+    
+    #mUI.MelMenuItemDiv(_arrange)        
+    mc.menuItem(parent=_arrange,
+              l = '2[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'even','curve':'cubicRebuild','spans':2}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild2Even'))
+    mc.menuItem(parent=_arrange,
+              l = '2[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'spaced','curve':'cubicRebuild','spans':2}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild2Spaced'))
+    mc.menuItem(parent=_arrange,
+              l = '3[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'even','curve':'cubicRebuild','spans':2}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild3Even'))
+    mc.menuItem(parent=_arrange,
+              l = '3[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'even','curve':'cubicRebuild','spans':3}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild3Spaced'))    
 
 def uiSection_distance(parent = None, selection = None, pairSelected = True):
     _p = mc.menuItem(parent=parent, subMenu = True,tearOff = True,
@@ -602,6 +646,10 @@ def uiSection_mrs(parent):
                 l='mrsBuilder',
                 ann = "WIP",
                 c=lambda *a:TOOLCALLS.mrsUI())
+    mc.menuItem(parent = parent,
+                l='MRS Documentation',
+                ann = "Access to MRS Docmenation || Subscription required.",
+                c=lambda *a: webbrowser.open("https://www.cgmonastery.com/teams/mrs-collaborative/documentation/"))      
 
     
 def uiSection_hotkeys(parent):
@@ -631,7 +679,7 @@ import cgm.core.tests.cgmTests as CGMTEST
 reload(CGMTEST)
 
 def loadLocalPython():
-    mel.eval('python("from cgm.core import cgm_Meta as cgmMeta;from cgm.core import cgm_Deformers as cgmDeformers;from cgm.core import cgm_General as cgmGen;from cgm.core.rigger import RigFactory as Rig;from cgm.core import cgm_PuppetMeta as cgmPM;from cgm.core import cgm_RigMeta as cgmRigMeta;import Red9.core.Red9_Meta as r9Meta;import cgm.core;cgm.core._reload();import maya.cmds as mc;import cgm.core.cgmPy.validateArgs as VALID")')
+    mel.eval('python("import cgm.core;cgm.core._reload();import cgm.core.cgm_Meta as cgmMeta;import cgm.core.cgm_Deformers as cgmDeformers;import cgm.core.cgm_General as cgmGen;import cgm.core.cgm_PuppetMeta as cgmPM;import cgm.core.cgm_RigMeta as cgmRigMeta;import Red9.core.Red9_Meta as r9Meta;import maya.cmds as mc;import cgm.core.cgmPy.validateArgs as VALID")')
 
 def load_MorpheusMaker( *a ):
     try:
@@ -751,7 +799,16 @@ def uiSection_dev(parent):
                 l='OLD - limb',
                 ann = "WARNING - Opens new file...Unit test cgm.core",
                 c=lambda *a: ut_limbOLD()) 
-
+    
+    #Capture ------------------------------------------
+    _screenGrab = mc.menuItem(parent = parent,subMenu = True,tearOff = True,
+                             l='Screen grab Mode')
+    mc.menuItem(parent = _screenGrab,
+                l='Off',
+                c=lambda *a: CGMPROJECTS.setup_forCapture(0))    
+    mc.menuItem(parent = _screenGrab,
+                l='On',
+                c=lambda *a: CGMPROJECTS.setup_forCapture(1))
     
 def ut_cgmTestCall(*args,**kws):
     import cgm.core.tests.cgmTests as cgmTests
@@ -1104,18 +1161,59 @@ def uiSection_snap(parent, selection = None ):
                 ann = "Update the buffer (if exists)")    
     
     #>>Arrange ----------------------------------------------------------------------------------------
-    _arrange= mc.menuItem(parent=parent,subMenu = True,
+    _arrange= mc.menuItem(parent=parent,subMenu = True,tearOff=True,
                           l = 'Arrange',
                           ann = "Ordered layout of selected items")    
     mc.menuItem(parent=_arrange,
-                l = 'Along line(Even)',
-                c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{}),                                               
-                ann = "Layout on line from first to last item")
+                  l = 'Linear[Even]',
+                  ut = 'cgmUITemplate',
+                  c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{}),                                               
+                  ann = ARRANGE._d_arrangeLine_ann.get('linearEven'))
     mc.menuItem(parent=_arrange,
-                l = 'Along line(Spaced)',
-                c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine', **{'mode':'spaced'}),                                               
-                ann = "Layout on line from first to last item closest as possible to original position")   
+                l = 'Linear[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'spaced'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('linearSpaced'))
     
+    mUI.MelMenuItemDiv(_arrange)        
+
+    mc.menuItem(parent=_arrange,
+              l = 'Curve[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'even','curve':'cubic'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicEven'))
+    mc.menuItem(parent=_arrange,
+              l = 'Arc[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'even','curve':'cubicArc'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicArcEven'))
+    mc.menuItem(parent=_arrange,
+              l = 'Arc[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'spaced','curve':'cubicArc'}),                                               
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicArcSpaced'))    
+    
+    mUI.MelMenuItemDiv(_arrange)        
+    mc.menuItem(parent=_arrange,
+              l = '2[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'even','curve':'cubicRebuild','spans':2}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild2Even'))
+    mc.menuItem(parent=_arrange,
+              l = '2[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'spaced','curve':'cubicRebuild','spans':2}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild2Spaced'))
+    mc.menuItem(parent=_arrange,
+              l = '3[Even]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'even','curve':'cubicRebuild','spans':3}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild3Even'))
+    mc.menuItem(parent=_arrange,
+              l = '3[Spaced]',
+              ut = 'cgmUITemplate',
+              c = cgmGEN.Callback(MMCONTEXT.func_process, ARRANGE.alongLine, None,'all', 'AlongLine',noSelect = 0, **{'mode':'spaced','curve':'cubicRebuild','spans':3}),
+              ann = ARRANGE._d_arrangeLine_ann.get('cubicRebuild3Spaced'))    
     #cgmUI.mUI.MelSeparator(parent)
     mc.menuItem(parent=parent,
                 l = 'Snap UI',

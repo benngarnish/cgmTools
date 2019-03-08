@@ -19,7 +19,7 @@ import pprint
 import logging
 logging.basicConfig()
 log = logging.getLogger(__name__)
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 # From Maya =============================================================
 import maya.cmds as mc
@@ -64,19 +64,19 @@ def attach_toShape(obj = None, targetShape = None, connectBy = 'parent'):
         _str_func = 'attach_toShape'
         mObj = cgmMeta.validateObjArg(obj,'cgmObject')
         targetShape = VALID.mNodeString(targetShape)
-        log.info("targetShape: {0}".format(targetShape))
+        log.debug("targetShape: {0}".format(targetShape))
 
         #Get our data...
         d_closest = DIST.get_closest_point_data(targetShape,
                                                 mObj.mNode)
 
         log.debug("|{0}| >> jnt: {1} | {2}".format(_str_func,mObj.mNode, d_closest))
-        pprint.pprint(d_closest)
+        #pprint.pprint(d_closest)
 
         if d_closest['type'] in ['mesh','nurbsSurface']:
             log.debug("|{0}| >> Follicle mode...".format(_str_func))
             _shape = SHAPES.get_nonintermediate(d_closest['shape'] )
-            log.info("_shape: {0}".format(_shape))
+            log.debug("_shape: {0}".format(_shape))
 
             l_follicleInfo = NODES.createFollicleOnMesh( _shape )
 
@@ -84,7 +84,7 @@ def attach_toShape(obj = None, targetShape = None, connectBy = 'parent'):
             i_follicleShape = cgmMeta.asMeta(l_follicleInfo[0],'cgmNode')
 
             #> Name...
-            i_follicleTrans.doStore('cgmName',mObj.mNode)
+            i_follicleTrans.doStore('cgmName',mObj)
             i_follicleTrans.doStore('cgmTypeModifier','surfaceTrack')            
             i_follicleTrans.doName()
             _trackTransform = i_follicleTrans.mNode
@@ -106,14 +106,14 @@ def attach_toShape(obj = None, targetShape = None, connectBy = 'parent'):
             mPOCI.parameter = d_closest['parameter']
 
             mTrack = mObj.doCreateAt()
-            mTrack.doStore('cgmName',mObj.mNode)
+            mTrack.doStore('cgmName',mObj)
             mTrack.doStore('cgmType','surfaceTrack')
             mTrack.doName()
 
             _trackTransform = mTrack.mNode
 
             mc.connectAttr("%s.position"%mPOCI.mNode,"%s.t"%_trackTransform)
-            mPOCI.doStore('cgmName',mObj.mNode)            
+            mPOCI.doStore('cgmName',mObj)            
             mPOCI.doName()            
             _res = [mTrack.mNode, mPOCI.mNode]
 
@@ -162,7 +162,7 @@ def attach_toShape(obj = None, targetShape = None, connectBy = 'parent'):
             raise NotImplementedError,"|{0}| >>invalid connectBy: {1}".format(_str_func,connectBy)  
 
         #pprint.pprint(vars())
-    except Exception,err:cgmGEN.cgmException(Exception,err)
+    except Exception,err:cgmGEN.cgmExceptCB(Exception,err)
 
 def driven_disconnect(driven = None, driver = None, mode = 'best'):
     """
@@ -424,7 +424,7 @@ def build_aimSequence(l_driven = None,
             mUpDecomp = cgmMeta.cgmNode(nodeType = 'decomposeMatrix')
             mUpDecomp.rename("{0}_aimMatrix".format(ml_parents[i].p_nameBase))
 
-            #mUpDecomp.doStore('cgmName',ml_parents[i].mNode)                
+            #mUpDecomp.doStore('cgmName',ml_parents[i])                
             #mUpDecomp.addAttr('cgmType','aimMatrix',attrType='string',lock=True)
             #mUpDecomp.doName()
 
@@ -530,7 +530,7 @@ def build_aimSequence(l_driven = None,
                 mUpDecomp = cgmMeta.cgmNode(nodeType = 'decomposeMatrix')
                 mUpDecomp.rename("{0}_aimMatrix".format(ml_parents[i].p_nameBase))
 
-                #mUpDecomp.doStore('cgmName',ml_parents[i].mNode)                
+                #mUpDecomp.doStore('cgmName',ml_parents[i])                
                 #mUpDecomp.addAttr('cgmType','aimMatrix',attrType='string',lock=True)
                 #mUpDecomp.doName()
 
@@ -579,7 +579,7 @@ def build_aimSequence(l_driven = None,
             #Decompose matrix for parent...
             """
             mUpDecomp = cgmMeta.cgmNode(nodeType = 'decomposeMatrix')
-            mUpDecomp.doStore('cgmName',ml_parents[i].mNode)                
+            mUpDecomp.doStore('cgmName',ml_parents[i])                
             mUpDecomp.addAttr('cgmType','aimMatrix',attrType='string',lock=True)
             mUpDecomp.doName()
 
@@ -626,10 +626,10 @@ def build_aimSequence(l_driven = None,
 
             mDriven.parent = False
 
-            log.info("|{0}| >> obj: {1} | {2}".format(_str_func,i,mDriven))
-            log.info("|{0}| >> forward: {1}".format(_str_func,s_targetForward))
-            log.info("|{0}| >> back: {1}".format(_str_func,s_targetBack))
-            log.info(cgmGEN._str_subLine)
+            log.debug("|{0}| >> obj: {1} | {2}".format(_str_func,i,mDriven))
+            log.debug("|{0}| >> forward: {1}".format(_str_func,s_targetForward))
+            log.debug("|{0}| >> back: {1}".format(_str_func,s_targetBack))
+            log.debug(cgmGEN._str_subLine)
 
             if b_first:
                 const = mc.orientConstraint([s_targetBack, s_targetForward], mAimGroup.mNode, maintainOffset = True)[0]
@@ -693,7 +693,7 @@ def build_aimSequence(l_driven = None,
 
         #Decompose matrix for parent...
         mUpDecomp = cgmMeta.cgmNode(nodeType = 'decomposeMatrix')
-        mUpDecomp.doStore('cgmName',ml_parents[i].mNode)                
+        mUpDecomp.doStore('cgmName',ml_parents[i])                
         mUpDecomp.addAttr('cgmType','aimMatrix',attrType='string',lock=True)
         mUpDecomp.doName()
 

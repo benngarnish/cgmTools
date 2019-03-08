@@ -27,7 +27,7 @@ import Red9.core.Red9_Meta as r9Meta
 
 # From cgm ==============================================================
 #NO LOC
-from cgm.core import cgm_General as cgmGen
+from cgm.core import cgm_General as cgmGEN
 from cgm.core.cgmPy import validateArgs as VALID
 from cgm.core.lib import shared_data as SHARED
 from cgm.core.lib import search_utils as SEARCH
@@ -41,9 +41,53 @@ from cgm.core.lib import list_utils as LIST
 reload(POS)
 reload(MATHUTILS)
 
-from cgm.lib import attributes
+#from cgm.lib import attributes
 #>>> Utilities
 #===================================================================
+def scale_to_axisSize(arg = None, size = None):
+    _str_func = 'scale_to_axisSize'
+    log.debug(cgmGEN.logString_start(_str_func))
+    _currentSize = get_axisSize(arg)
+    _currentScale = ATTR.get(arg,'scale')
+    _targetScale = []
+    for i,s in enumerate(size):
+        if s is not None:
+            v = (_currentScale[i] * s) / _currentSize[i]
+            _targetScale.append(v)
+        else:
+            _targetScale.append(_currentScale[i])
+    #log.info(_targetScale)
+    
+    for i,a in enumerate('xyz'):
+        if size[i]:
+            ATTR.set(arg,'s{0}'.format(a),_targetScale[i])
+
+def get_axisSize(arg):
+    try:
+        _str_func = 'get_axisSize'
+        bbSize = get_bb_size(arg)
+        
+        d_res = {'x':[],'y':[],'z':[]}
+        
+        _startPoint = POS.get(arg,'bb')
+        _res = []
+        for i,k in enumerate('xyz'):
+            log.debug("|{0}| >> On t: {1} | {2}".format(_str_func,arg,k))
+            
+            pos_pos = get_pos_by_axis_dist(arg,k+'+',bbSize[i]*1.5)
+            pos_neg = get_pos_by_axis_dist(arg,k+'-',bbSize[i]*1.5)
+            
+            pos1 = get_closest_point(pos_pos,arg)
+            pos2 = get_closest_point(pos_neg,arg)
+    
+            dist = get_distance_between_points(pos1[0],pos2[0])
+            _res.append(dist)
+            
+        return (_res)
+    except Exception,err:cgmGEN.cgmException(Exception,err)
+
+
+
 get_bb_size = POS.get_bb_size
 
 def get_bb_sizeOLD(arg = None, shapes = False, mode = None):
@@ -369,7 +413,7 @@ def get_vectorOffset(obj = None, origin = None, distance = 0, asEuclid = False):
         return MATHUTILS.Vector3(newPos[0],newPos[1],newPos[2])
     return newPos
 
-def set_vectorOffset(obj = None, origin = None, distance = 0, asEuclid = False):
+def set_vectorOffset(obj = None, origin = None, distance = 0, vector = None, mode = 'origin', asEuclid = False):
     """
     Set the vector offset of a given object with a distance. Designed as a replacment
     for maya's curve offset as it's finicky coupled with
@@ -383,11 +427,14 @@ def set_vectorOffset(obj = None, origin = None, distance = 0, asEuclid = False):
     :returns
         pos(list/Vector3)
     """   
-    newPos = get_vectorOffset(obj,origin,distance)
+    if mode == 'origin':
+        newPos = get_vectorOffset(obj,origin,distance)
+    else:
+        newPos = get_pos_by_vec_dist(POS.get(obj),vector,distance)
     POS.set(obj,newPos)
     return newPos
 
-def offsetShape_byVector(dag=None, distance = 1, origin = None, component = 'cv'):
+def offsetShape_byVector(dag=None, distance = 1, origin = None, component = 'cv', vector = None, mode = 'origin'):
     """
     Attempt for more consistency 
     
@@ -427,7 +474,8 @@ def offsetShape_byVector(dag=None, distance = 1, origin = None, component = 'cv'
         
         for ii,c in enumerate(_l_source):
             log.debug("|{0}| >> Shape {1} | Comp: {2} | {3}".format(_str_func, i, ii, c))            
-            set_vectorOffset(c,_origin,distance)
+            set_vectorOffset(c,_origin,distance,vector,mode=mode)
+
         
     return True
 
@@ -606,13 +654,13 @@ def get_closest_point(source = None, targetSurface = None, loc = False):
         if _type == 'mesh':
             _node = mc.createNode ('closestPointOnMesh')
             
-            attributes.doConnectAttr((_loc+'.translate'),(_node+'.inPosition'))
-            attributes.doConnectAttr((s+'.worldMesh'),(_node+'.inMesh'))
-            attributes.doConnectAttr((s+'.worldMatrix'),(_node+'.inputMatrix'))
+            ATTR.connect((_loc+'.translate'),(_node+'.inPosition'))
+            ATTR.connect((s+'.worldMesh'),(_node+'.inMesh'))
+            ATTR.connect((s+'.worldMatrix'),(_node+'.inputMatrix'))
             
-            _pos = attributes.doGetAttr(_node,'position')
+            _pos = ATTR.get(_node,'position')
             _tmpLoc = mc.spaceLocator(n='tmp')[0]
-            attributes.doConnectAttr ((_node+'.position'),(_tmpLoc+'.translate'))            
+            ATTR.connect ((_node+'.position'),(_tmpLoc+'.translate'))            
             
             _l_res_positions.append( POS.get(_tmpLoc)  )
             mc.delete(_node)
@@ -621,12 +669,12 @@ def get_closest_point(source = None, targetSurface = None, loc = False):
         elif _type == 'nurbsSurface':
             closestPointNode = mc.createNode ('closestPointOnSurface')
             
-            attributes.doSetAttr(closestPointNode,'inPositionX',_point[0])
-            attributes.doSetAttr(closestPointNode,'inPositionY',_point[1])
-            attributes.doSetAttr(closestPointNode,'inPositionZ',_point[2])  
+            ATTR.set(closestPointNode,'inPositionX',_point[0])
+            ATTR.set(closestPointNode,'inPositionY',_point[1])
+            ATTR.set(closestPointNode,'inPositionZ',_point[2])  
             
-            attributes.doConnectAttr((s +'.worldSpace'),(closestPointNode+'.inputSurface'))
-            _l_res_positions.append(attributes.doGetAttr(closestPointNode,'position'))
+            ATTR.connect((s +'.worldSpace'),(closestPointNode+'.inputSurface'))
+            _l_res_positions.append(ATTR.get(closestPointNode,'position'))
             mc.delete(closestPointNode)
             
         elif _type == 'nurbsCurve':
@@ -713,7 +761,7 @@ def create_distanceMeasure(start = None, end = None, baseName = 'measure'):
     
 
         return _res
-    except Exception,err:cgmGen.cgmException(Exception,err)
+    except Exception,err:cgmGen.cgmExceptCB(Exception,err)
 
 def create_closest_point_node(source = None, targetSurface = None, singleReturn = False):
     """
@@ -764,20 +812,23 @@ def create_closest_point_node(source = None, targetSurface = None, singleReturn 
                 log.error("|{0}| >> Unsupported target surface type. Skipping: {1} |{2} ".format(_str_func,s,_type))
                 continue
             
-            _res_loc = mc.spaceLocator(n='{0}_to_{1}_result_loc'.format(NAMES.get_base(source), NAMES.get_base(s)))[0]
+            _loc = mc.spaceLocator()[0]
+            _res_loc = mc.rename(_loc,'{0}_to_{1}_result_loc'.format(NAMES.get_base(source),
+                                                                        NAMES.get_base(s)))
             _locs.append(_res_loc)
             _types.append(_type)
             _shapes.append(s)
             
             if _type == 'mesh':
                 _node = mc.createNode ('closestPointOnMesh')
-                _node = mc.rename(_node, "{0}_to_{1}_closePntMeshNode".format(NAMES.get_base(source), NAMES.get_base(s)))
-                attributes.doConnectAttr((_transform+'.translate'),(_node+'.inPosition'))
-                attributes.doConnectAttr((s+'.worldMesh'),(_node+'.inMesh'))
-                attributes.doConnectAttr((s+'.worldMatrix'),(_node+'.inputMatrix'))
+                _node = mc.rename(_node, "{0}_to_{1}_closePntMeshNode".format(NAMES.get_base(source),
+                                                                              NAMES.get_base(s)))
+                ATTR.connect((_transform+'.translate'),(_node+'.inPosition'))
+                ATTR.connect((s+'.worldMesh'),(_node+'.inMesh'))
+                ATTR.connect((s+'.worldMatrix'),(_node+'.inputMatrix'))
                 
-                _pos = attributes.doGetAttr(_node,'position')
-                attributes.doConnectAttr ((_node+'.position'),(_res_loc+'.translate'))  
+                _pos = ATTR.get(_node,'position')
+                ATTR.connect((_node+'.position'),(_res_loc+'.translate'))  
                 
                 _nodes.append(_node)
                 
@@ -791,9 +842,9 @@ def create_closest_point_node(source = None, targetSurface = None, singleReturn 
                 #attributes.doSetAttr(closestPointNode,'inPositionY',_point[1])
                 #attributes.doSetAttr(closestPointNode,'inPositionZ',_point[2])  
                 
-                attributes.doConnectAttr((s +'.worldSpace'),(closestPointNode+'.inputSurface'))
+                ATTR.connect((s +'.worldSpace'),(closestPointNode+'.inputSurface'))
                 
-                attributes.doConnectAttr ((closestPointNode+'.position'),(_res_loc+'.translate'))  
+                ATTR.connect ((closestPointNode+'.position'),(_res_loc+'.translate'))  
                 _nodes.append(closestPointNode)
                 
             elif _type == 'nurbsCurve':
@@ -805,7 +856,7 @@ def create_closest_point_node(source = None, targetSurface = None, singleReturn 
                 mc.connectAttr ((_transform+'.translate'),(_node+'.inPosition'))
                 mc.connectAttr ((s+'.worldSpace'),(_node+'.inputCurve'))
                 
-                attributes.doConnectAttr ((_node+'.position'),(_res_loc+'.translate'))  
+                ATTR.connect((_node+'.position'),(_res_loc+'.translate'))  
                 _nodes.append(_node)
                 
         if not singleReturn:
@@ -827,7 +878,7 @@ def create_closest_point_node(source = None, targetSurface = None, singleReturn 
                 mc.delete(n, _locs[i])
         
         return _locs[_idx], _nodes[_idx], _shapes[_idx], _types[_idx]
-    except Exception,err:cgmGen.cgmException(Exception,err)
+    except Exception,err:cgmGen.cgmExceptCB(Exception,err)
 
 
     
@@ -883,9 +934,9 @@ def get_closest_point_data_from_mesh(mesh = None, targetObj = None, targetPoint 
     _node = mc.createNode ('closestPointOnMesh')
 
     """ to account for target objects in heirarchies """
-    attributes.doConnectAttr((targetObj+'.translate'),(_node+'.inPosition'))
-    attributes.doConnectAttr((_shape+'.worldMesh'),(_node+'.inMesh'))
-    attributes.doConnectAttr((_shape+'.matrix'),(_node+'.inputMatrix'))
+    ATTR.connect((targetObj+'.translate'),(_node+'.inPosition'))
+    ATTR.connect((_shape+'.worldMesh'),(_node+'.inMesh'))
+    ATTR.connect((_shape+'.matrix'),(_node+'.inputMatrix'))
     _u = mc.getAttr(_node+'.parameterU')
     _v = mc.getAttr(_node+'.parameterV')
     
@@ -893,8 +944,8 @@ def get_closest_point_data_from_mesh(mesh = None, targetObj = None, targetPoint 
     _res = {}
     
     _res['shape'] = _shape
-    _res['position']=attributes.doGetAttr(_node,'position')
-    _res['normal']=attributes.doGetAttr(_node,'normal')
+    _res['position']=ATTR.get(_node,'position')
+    _res['normal']=ATTR.get(_node,'normal')
     _res['parameterU']= _u
     _res['parameterV']= _v
     #_res['normalizedU'] = _norm[0]
@@ -947,8 +998,8 @@ def get_closest_point_data(targetSurface = None, targetObj = None, targetPoint =
         
         _res['shape'] = _shape
         _res['type'] = _type
-        _res['position']=attributes.doGetAttr(_node,'position')
-        _res['normal']=attributes.doGetAttr(_node,'normal')
+        _res['position']=ATTR.get(_node,'position')
+        _res['normal']=ATTR.get(_node,'normal')
         
         if _type == 'nurbsCurve':
             _res['parameter']= ATTR.get(_node,'parameter')
@@ -968,7 +1019,7 @@ def get_closest_point_data(targetSurface = None, targetObj = None, targetPoint =
                 _res['closestVertexIndex']=mc.getAttr(_node+'.closestVertexIndex')
         mc.delete([_loc],_created[0],_node)
         return _res
-    except Exception,err:cgmGen.cgmException(Exception,err)
+    except Exception,err:cgmGen.cgmExceptCB(Exception,err)
 
 def get_normalizedWeightsByDistance(obj,targets,normalizeTo=1.0):
     _str_func = 'get_normalizedWeightsByDistance'
@@ -1071,10 +1122,10 @@ def get_normalized_uv(mesh, uValue, vValue):
                 log.debug("|{0}| >> Transform provided. using first shape: {1}".format(_str_func,shape))
             else:shape = _mesh
   
-            uMin = attributes.doGetAttr(shape,'mnu')
-            uMax = attributes.doGetAttr(shape,'mxu')
-            vMin = attributes.doGetAttr(shape,'mnv')
-            vMax = attributes.doGetAttr(shape,'mxv')         
+            uMin = ATTR.get(shape,'mnu')
+            uMax = ATTR.get(shape,'mxu')
+            vMin = ATTR.get(shape,'mnv')
+            vMax = ATTR.get(shape,'mxv')         
             """uMin = mi_shape.mnu
             uMax = mi_shape.mxu
             vMin = mi_shape.mnv
@@ -1142,10 +1193,10 @@ def returnNormalizedUV(mesh, uValue, vValue):
                 log.debug( "More than one shape found. Using 0. targetSurface : %s | shapes: %s"%(mesh,l_shapes) )
             #mi_shape = cgmMeta.validateObjArg(l_shapes[0],cgmMeta.cgmNode,noneValid=False)
 
-            uMin = attributes.doGetAttr(l_shapes[0],'mnu')
-            uMax = attributes.doGetAttr(l_shapes[0],'mxu')
-            vMin = attributes.doGetAttr(l_shapes[0],'mnv')
-            vMax = attributes.doGetAttr(l_shapes[0],'mxv')         
+            uMin = ATTR.get(l_shapes[0],'mnu')
+            uMax = ATTR.get(l_shapes[0],'mxu')
+            vMin = ATTR.get(l_shapes[0],'mnv')
+            vMax = ATTR.get(l_shapes[0],'mxv')         
             """uMin = mi_shape.mnu
             uMax = mi_shape.mxu
             vMin = mi_shape.mnv

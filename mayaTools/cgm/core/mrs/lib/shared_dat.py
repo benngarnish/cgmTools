@@ -12,6 +12,7 @@ Website : http://www.cgmonks.com
 d_defaultAttrs= {'version':'string',#Attributes to be initialzed for any module
                 'blockType':'string',
                 #'moduleTarget':'messageSimple',
+                'baseDat':'string',
                 'baseSize':'float3',
                 'cgmName':'string',
                 'cgmDirection':'string',
@@ -73,7 +74,9 @@ _d_attrsTo_make = {'side':'none:left:right:center',
                    'baseUp':'float3',
                    'baseAim':'float3',
                    'basePoint':'float3',
-                   'baseDat':'string',                   
+                   'baseDat':'string',
+                   'blockProfile':'string',
+                   
                    'controlOffset':'float',
                    'basicShape':'circle:square:pyramid:semiSphere:sphere:cube',
                    'proxyShape':'cube:sphere:cylinder:cone:torus',
@@ -85,10 +88,12 @@ _d_attrsTo_make = {'side':'none:left:right:center',
                    'addMotionJoint':'bool',
                    'proxy':'off:lock:on',
                    'addScalePivot':'bool',                   
-                   'loftShape':'circle:square:diamond:wideUp:wideDown:widePos:wideNeg',
+                   'loftShape':'circle:wideUp:wideDown:widePos:wideNeg:diamond:square:squareRoundUp:squareRoundDown:squareUp:squareDown:squarePos:squareNeg:squircle:squircleDiamond:squircleUp:squircleDown:squirclePos:squircleNeg:triUp:triDown:triPos:triNeg:digit',
                    'loftSides':'int',     
                    'loftSplit':'int',
+                   'loftList':'enumDatList',
                    'loftDegree':'linear:cubic',
+                   'loftReverseNormal':'bool',
                    'controlType':'main:sub:direct:extra',    
                    'nameList':'stringDatList',
                    'namesHandles':'stringDatList',
@@ -98,8 +103,9 @@ _d_attrsTo_make = {'side':'none:left:right:center',
                    'nameIter':'string',
                    'numControls':'int',
                    'numJoints':'int',
-                   'numRoll':'int',                   
+                   'numRoll':'int',
                    'numShapers':'int',
+                   'numSubShapers':'int',
                    'numSpacePivots':'int',
                    'hasLeverJoint':'bool',
                    'buildLeverBase':'bool',#...fkRoot is our clav like setup
@@ -125,20 +131,27 @@ _d_attrsTo_make = {'side':'none:left:right:center',
                    #'ribbonConnectBy': 'constraint:matrix',
                    'ribbonParam': 'fixed:floating:blend',
                    'segmentMidIKControl':'bool',
-                   
-                   
+                   'spaceSwitch_direct':'bool',
+                   'spaceSwitch_fk':'bool',
                    'scaleSetup':'bool',
                    'settingsPlace':'start:end',
                    'settingsDirection':'up:down:out:in',
                    'proxyDirect':'bool',
-                   'proxyType':'none:castMesh'}
+                   'proxyGeoRoot':'none:loft:ball',
+                   'proxyType':'none:castMesh',
+                   'visBoundingBox':'bool',
+                   'visRotatePlane':'bool',                   
+                   'visMeasure':'bool',}
 
+_l_defineHandlesOrder = ['end','start','up','rp','aim','lever']
 _l_pivotOrder = ['center','back','front','left','right']
 _d_pivotBankNames = {'default':{'left':'outer','right':'inner'},
                       'right':{'left':'inner','right':'outer'}}
 
 _d_mirrorAttrCheck = {'loftShape':{'widePos':'wideNeg',
-                               'wideNeg':'widePos'},
+                                   'wideNeg':'widePos',
+                                   'triPos':'triNeg',
+                                   'triNeg':'triPos'},
                       'testing':{}}
 
 #>> State Attr Masks =================================================================================

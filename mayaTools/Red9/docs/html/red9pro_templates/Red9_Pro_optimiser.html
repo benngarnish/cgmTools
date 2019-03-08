@@ -633,6 +633,19 @@ compound in the HealthManager for quick access to these key optimisations</p>
 </dd></dl>
 
 <dl class="class">
+<dt id="Red9.pro_pack.core.optimiser.BlendShapes_HealthValidation">
+<em class="property">class </em><code class="descname">BlendShapes_HealthValidation</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.BlendShapes_HealthValidation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#Red9.pro_pack.core.optimiser.HealthValidation" title="Red9.pro_pack.core.optimiser.HealthValidation"><code class="xref py py-class docutils literal"><span class="pre">Red9.pro_pack.core.optimiser.HealthValidation</span></code></a></p>
+<p>Base test to validate the health of all Blendshapes in the scene.</p>
+<p>This will:</p>
+<ul class="simple">
+<li>Test for missing indexes and pad to fix if found - this by-passes fbx issues on export!</li>
+<li>Test that all original target geo is in the scene and if not, it will re-generate it</li>
+<li>Test that all target geo in the scene is named as per the blendshape target channel and rename if not</li>
+</ul>
+</dd></dl>
+
+<dl class="class">
 <dt id="Red9.pro_pack.core.optimiser.All_Available_Tests">
 <em class="property">class </em><code class="descname">All_Available_Tests</code><span class="sig-paren">(</span><em>*args</em>, <em>**kws</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.All_Available_Tests" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#Red9.pro_pack.core.optimiser.HealthValidation" title="Red9.pro_pack.core.optimiser.HealthValidation"><code class="xref py py-class docutils literal"><span class="pre">Red9.pro_pack.core.optimiser.HealthValidation</span></code></a></p>
@@ -664,7 +677,8 @@ individual tests</p>
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.maya_timeUnits_fix">
 <code class="descname">maya_timeUnits_fix</code><span class="sig-paren">(</span><em>HealthObject</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.maya_timeUnits_fix" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>TODO: this should adjust the exportLoop timings also</p>
+</dd></dl>
 
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.maya_sceneUnits_test">
@@ -716,8 +730,16 @@ individual tests</p>
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.maya_version_required_test">
 <code class="descname">maya_version_required_test</code><span class="sig-paren">(</span><em>expected=2016.0</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.maya_version_required_test" title="Permalink to this definition">¶</a></dt>
-<dd><p>Maya Target Version: make sure that the target version of Maya 
-matches the given, this is a float so 2015.0, 2016.0, 2016.5. 
+<dd><p>Maya Target Version: make sure that the target version of Maya
+matches the given, this is a float so 2015.0, 2016.0, 2016.5.
+Uses the r9Setup.mayaVersion() call to get the data</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="Red9.pro_pack.core.optimiser.maya_version_lowest_base_test">
+<code class="descname">maya_version_lowest_base_test</code><span class="sig-paren">(</span><em>expected=2016.0</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.maya_version_lowest_base_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Maya Target Lowest Base: make sure that the target version of Maya
+is equal, or above the given, this is a float so 2015.0, 2016.0, 2016.5.
 Uses the r9Setup.mayaVersion() call to get the data</p>
 </dd></dl>
 
@@ -1066,7 +1088,32 @@ bound to it internally</p>
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.mRigs_filterssettings_fix">
 <code class="descname">mRigs_filterssettings_fix</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.mRigs_filterssettings_fix" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bind the given fiklterSettings preset config file internally to the mRig</p>
+<dd><p>Bind the given filterSettings preset config file internally to the mRig</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="Red9.pro_pack.core.optimiser.exportLoopNode_framerate_test">
+<code class="descname">exportLoopNode_framerate_test</code><span class="sig-paren">(</span><em>expected=True</em>, <em>loops=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.exportLoopNode_framerate_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>generic ExportLoopNode check to make sure that framerate changes are
+reflected in the export ranges</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>expected</strong> &#8211; this gets filled by the currentFramerate</li>
+<li><strong>loops</strong> &#8211; given exportLoops to test, if None then we find all instances of ExportLoopNodes in the scene</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="Red9.pro_pack.core.optimiser.exportLoopNode_framerate_fix">
+<code class="descname">exportLoopNode_framerate_fix</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.exportLoopNode_framerate_fix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bind the given filterSettings preset config file internally to the mRig</p>
 </dd></dl>
 
 <dl class="function">
@@ -1215,7 +1262,7 @@ results_failed={shortname:(longname1, longname2, ...)}</p>
 <li>jnt.overrideDisplayType = 0</li>
 <li>jnt.drawStyle = 0</li>
 </ul>
-<p>if any of the folowing settings aren&#8217;t met the jnt fails. This is to return the entire
+<p>if any of the following settings aren&#8217;t met the jnt fails. This is to return the entire
 skeleton back to default draw states prior to the Red9 Puppet build
 as that needs full control over these over-rides during the build process</p>
 <p>Running the fix method will reset the attrs back to default</p>
@@ -1259,6 +1306,32 @@ prior to testing and save the pose to the filepath rather than running the actua
 </tr>
 </tbody>
 </table>
+</dd></dl>
+
+<dl class="function">
+<dt id="Red9.pro_pack.core.optimiser.skeleton_bindPose_test">
+<code class="descname">skeleton_bindPose_test</code><span class="sig-paren">(</span><em>expected=1</em>, <em>skeleton_roots=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.skeleton_bindPose_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>check if we have multiple bindPoses in the scene, if they all relate to the same skeleton hierarchy
+we fail the test. Conversely if we have multiple skeletons in the scene we also bail the test</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>expected</strong> &#8211; max number of bindPoses any skeleton root can have, default = 1</li>
+<li><strong>skeleton_roots</strong> &#8211; if given we only test the given skeletons hierarchy for bindPoses, else we find
+all bindPose nodes and all associated skeleton hierarchies, and test them all for multiple bindPoses</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="Red9.pro_pack.core.optimiser.skeleton_bindPose_fix">
+<code class="descname">skeleton_bindPose_fix</code><span class="sig-paren">(</span><em>HealthObject</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.skeleton_bindPose_fix" title="Permalink to this definition">¶</a></dt>
+<dd><p>if the test failed this deletes all current bindPoses on the failed skeleton roots then creates a single new one</p>
 </dd></dl>
 
 <dl class="function">
@@ -1366,7 +1439,7 @@ new target for the missing index, there by fixing the FBX export issue for Unrea
 
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.mesh_compare_against_OBJ_test">
-<code class="descname">mesh_compare_against_OBJ_test</code><span class="sig-paren">(</span><em>expected</em>, <em>mesh</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.mesh_compare_against_OBJ_test" title="Permalink to this definition">¶</a></dt>
+<code class="descname">mesh_compare_against_OBJ_test</code><span class="sig-paren">(</span><em>expected</em>, <em>mesh</em>, <em>opendiff=False</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.mesh_compare_against_OBJ_test" title="Permalink to this definition">¶</a></dt>
 <dd><p>compare a given mesh against an expected OBJ file generated
 by the &#8220;mesh_compare_generate&#8221; func above and passed in as a path.
 This is useful when building complex facial systems so you can
@@ -1381,6 +1454,7 @@ is not enough re-assurance that the mesh matches.</p>
 <li><strong>expected</strong> &#8211; in this case a path to an obj file that we&#8217;re
 going to validate the given mesh against</li>
 <li><strong>mesh</strong> &#8211; mesh to compare against in scene</li>
+<li><strong>opendiff</strong> &#8211; if True open diffMerge and show the difference in the file structure</li>
 </ul>
 </td>
 </tr>
@@ -1390,7 +1464,7 @@ going to validate the given mesh against</li>
 <p class="first admonition-title">Note</p>
 <p class="last">This requires Diffmerge.exe, you can download from
 <a class="reference external" href="https://sourcegear.com/diffmerge/">https://sourcegear.com/diffmerge/</a>.
-Once downloaded drop it here Red9/pakcages/diffMerge.exe</p>
+Once downloaded drop it here Red9/packages/diffMerge.exe</p>
 </div>
 </dd></dl>
 
@@ -1402,7 +1476,7 @@ Once downloaded drop it here Red9/pakcages/diffMerge.exe</p>
 
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.mesh_frozen_xforms_fix">
-<code class="descname">mesh_frozen_xforms_fix</code><span class="sig-paren">(</span><em>HealthObject</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.mesh_frozen_xforms_fix" title="Permalink to this definition">¶</a></dt>
+<code class="descname">mesh_frozen_xforms_fix</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.mesh_frozen_xforms_fix" title="Permalink to this definition">¶</a></dt>
 <dd><p>fix method : freeze the failed meshes transforms</p>
 </dd></dl>
 
@@ -1422,7 +1496,7 @@ Once downloaded drop it here Red9/pakcages/diffMerge.exe</p>
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.texture_path_under_rootfolder_test">
 <code class="descname">texture_path_under_rootfolder_test</code><span class="sig-paren">(</span><em>expected=''</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.texture_path_under_rootfolder_test" title="Permalink to this definition">¶</a></dt>
-<dd><p>test to see if the texture paths for all file nodes are under 
+<dd><p>test to see if the texture paths for all file nodes are under
 the correct rootfolder path</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1576,7 +1650,9 @@ the failed namespaces into the root &#8221;:&#8221; space before removing the th
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.unknownPlugins_test">
 <code class="descname">unknownPlugins_test</code><span class="sig-paren">(</span><em>expected=True</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.unknownPlugins_test" title="Permalink to this definition">¶</a></dt>
-<dd><p>test to find unKnown/dead plug-in nodes in the scene and remove them</p>
+<dd><p>test to find unknown/dead plug-in nodes in the scene and remove them
+These are nodes from other plug-ins</p>
+<p>good reference: <a class="reference external" href="https://mayastation.typepad.com/maya-station/2015/04/how-to-prevent-maya-writing-a-requires-command-for-a-plug-in.html">https://mayastation.typepad.com/maya-station/2015/04/how-to-prevent-maya-writing-a-requires-command-for-a-plug-in.html</a></p>
 </dd></dl>
 
 <dl class="function">
@@ -1615,7 +1691,9 @@ the failed namespaces into the root &#8221;:&#8221; space before removing the th
 <dl class="function">
 <dt id="Red9.pro_pack.core.optimiser.turtle_nodes_delete">
 <code class="descname">turtle_nodes_delete</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#Red9.pro_pack.core.optimiser.turtle_nodes_delete" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove Turtle nodes from the scene</p>
+<dd><p>Remove Turtle nodes from the scene, note that from Maya 2017 we have a
+specific call in the ilrUserInterface.mel for this that doens&#8217;t cause a
+user prompt so we&#8217;re hooking to that</p>
 </dd></dl>
 
 <dl class="function">

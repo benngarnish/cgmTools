@@ -460,6 +460,8 @@ class DataMap(object):
         Load call for dealing with attrs : 
         use self.matchedPairs for the process list of pre-matched 
         tuples of (poseDict[key], node in scene)
+
+        fix: 07/11/18: added the clamp=True to the set calls so we set values to max/min if the input value is out of range
         '''
         _attrs_linear = ['translateX', 'translateY', 'translateZ']
 
@@ -492,10 +494,10 @@ class DataMap(object):
                         if _conversion_needed and self.unitconversion and attr in _attrs_linear:
                             _converted = r9Core.convertUnits_uiToInternal(r9Core.convertUnits_internalToUI(val, _unitsfile), _sceneunits)
                             log.debug('node : %s : attr : %s : UnitConverted : val %s == %s' % (dest, attr, val, _converted))
-                            cmds.setAttr('%s.%s' % (dest, attr), _converted)
+                            cmds.setAttr('%s.%s' % (dest, attr), _converted, c=True)
                         else:
                             log.debug('node : %s : attr : %s : val %s' % (dest, attr, val))
-                            cmds.setAttr('%s.%s' % (dest, attr), val)
+                            cmds.setAttr('%s.%s' % (dest, attr), val, c=True)
                     except StandardError, err:
                         log.debug(err)
             except:
@@ -525,7 +527,7 @@ class DataMap(object):
         # write to ConfigObject
         # =========================
         if self.dataformat == 'config':
-            ConfigObj = configobj.ConfigObj(indent_type='\t')
+            ConfigObj = configobj.ConfigObj(indent_type='\t', encoding='utf-8')
             ConfigObj['info'] = self.infoDict
             ConfigObj['filterNode_settings'] = self.settings.__dict__
             ConfigObj['poseData'] = self.poseDict
@@ -581,7 +583,7 @@ class DataMap(object):
                 if self._dataformat_resolved == 'config' or self.dataformat == 'config':
                     # for key, val in configobj.ConfigObj(filename)['filterNode_settings'].items():
                     #    self.settings.__dict__[key]=decodeString(val)
-                    self.poseDict = configobj.ConfigObj(filename)['poseData']
+                    self.poseDict = configobj.ConfigObj(filename, encoding='utf-8')['poseData']
                     if 'info' in configobj.ConfigObj(filename):
                         self.infoDict = configobj.ConfigObj(filename)['info']
                     if 'skeletonDict' in configobj.ConfigObj(filename):
@@ -910,7 +912,7 @@ class PoseData(DataMap):
 
         fn = r9Core.FilterNode(rootJnt)
         fn.settings.nodeTypes = 'joint'
-        fn.settings.incRoots = False
+        fn.settings.incRoots = True
         skeleton = fn.processFilter()
         parentNode = cmds.listRelatives(rootJnt, p=True, f=True)
 
@@ -1108,7 +1110,7 @@ class PoseData(DataMap):
 
         self.useFilter = useFilter  # used in the getNodes call
         self.maintainSpaces = maintainSpaces
-        self.mayaUpAxis = r9Setup.mayaUpAxis()
+        # self.mayaUpAxis = r9Setup.mayaUpAxis()  # already at the root level of the DataMap
 
         try:
             self._pre_load()
@@ -1131,8 +1133,10 @@ class PoseData(DataMap):
                     reference = objs[0]
                     self.PosePointCloud = PosePointCloud(self.nodesToLoad)
                     self.PosePointCloud.buildOffsetCloud(reference, raw=True)
-                    resetCache = [cmds.getAttr('%s.translate' % self.PosePointCloud.posePointRoot),
-                                cmds.getAttr('%s.rotate' % self.PosePointCloud.posePointRoot)]
+#                     resetCache = [cmds.getAttr('%s.translate' % self.PosePointCloud.posePointRoot),
+#                                 cmds.getAttr('%s.rotate' % self.PosePointCloud.posePointRoot)]
+                    pptRoot = r9Meta.MetaClass(self.PosePointCloud.posePointRoot)
+                    resetCache = [pptRoot.translate, pptRoot.rotate]
 
                     if self.maintainSpaces:
                         if self.metaRig:
@@ -1150,37 +1154,35 @@ class PoseData(DataMap):
 
                     if self.relativeRots == 'projected':
                         if self.mayaUpAxis == 'y':
-                            cmds.setAttr('%s.rx' % self.PosePointCloud.posePointRoot, 0)
-                            cmds.setAttr('%s.rz' % self.PosePointCloud.posePointRoot, 0)
-                        elif self.mayaUpAxis == 'z':  # fucking Z!!!!!!
-                            cmds.setAttr('%s.rx' % self.PosePointCloud.posePointRoot, 0)
-                            cmds.setAttr('%s.ry' % self.PosePointCloud.posePointRoot, 0)
+                            pptRoot.rx = 0
+                            pptRoot.rz = 0
+                        elif self.mayaUpAxis == 'z':
+                            pptRoot.rx = 0
+                            pptRoot.ry = 0
 
+                    # push data to the cloud
+                    # ======================
                     self.PosePointCloud.snapPosePntstoNodes()
 
+                    # absolute relative
                     if not self.relativeTrans == 'projected':
-                        cmds.setAttr('%s.translate' % self.PosePointCloud.posePointRoot,
-                                     resetCache[0][0][0],
-                                     resetCache[0][0][1],
-                                     resetCache[0][0][2])
+                        pptRoot.translate = resetCache[0]
                     if not self.relativeRots == 'projected':
-                        cmds.setAttr('%s.rotate' % self.PosePointCloud.posePointRoot,
-                                     resetCache[1][0][0],
-                                     resetCache[1][0][1],
-                                     resetCache[1][0][2])
+                        pptRoot.rotate = resetCache[1]
 
+                    # projected relative
                     if self.relativeRots == 'projected':
                         if self.mayaUpAxis == 'y':
-                            cmds.setAttr('%s.ry' % self.PosePointCloud.posePointRoot, resetCache[1][0][1])
+                            pptRoot.ry = resetCache[1][1]
                         elif self.mayaUpAxis == 'z':  # fucking Z!!!!!!
-                            cmds.setAttr('%s.rz' % self.PosePointCloud.posePointRoot, resetCache[1][0][2])
+                            pptRoot.rz = resetCache[1][2]
                     if self.relativeTrans == 'projected':
                         if self.mayaUpAxis == 'y':
-                            cmds.setAttr('%s.tx' % self.PosePointCloud.posePointRoot, resetCache[0][0][0])
-                            cmds.setAttr('%s.tz' % self.PosePointCloud.posePointRoot, resetCache[0][0][2])
+                            pptRoot.tx = resetCache[0][0]
+                            pptRoot.tz = resetCache[0][2]
                         elif self.mayaUpAxis == 'z':  # fucking Z!!!!!!
-                            cmds.setAttr('%s.tx' % self.PosePointCloud.posePointRoot, resetCache[0][0][0])
-                            cmds.setAttr('%s.ty' % self.PosePointCloud.posePointRoot, resetCache[0][0][1])
+                            pptRoot.tx = resetCache[0][0]
+                            pptRoot.ty = resetCache[0][1]
 
                     # if maintainSpaces then restore the original parentSwitch attr values
                     # BEFORE pushing the point cloud data back to the rig
@@ -1189,6 +1191,8 @@ class PoseData(DataMap):
                             log.debug('Resetting parentSwitches : %s.%s = %f' % (r9Core.nodeNameStrip(child), attr, value))
                             cmds.setAttr('%s.%s' % (child, attr), value)
 
+                    # pull data back from the cloud
+                    # =============================
                     self.PosePointCloud.snapNodestoPosePnts()
                     self.PosePointCloud.delete()
                     cmds.select(reference)
@@ -1364,7 +1368,7 @@ class PosePointCloud(object):
 
         self.rootReference = None  # root node used as the main pivot for the cloud
         self.isVisible = True  # Do we build the visual reference setup or not?
-
+        self.mRig = None
         self.ppcMeta = None  # MetaNode to cache the data
 
         if filterSettings:
@@ -1420,10 +1424,10 @@ class PosePointCloud(object):
         # auto logic for MetaRig - go find the renderMeshes wired to the systems
         if self.settings.metaRig:
             if not self.meshes:
-                mRig = r9Meta.getConnectedMetaSystemRoot(self.inputNodes)
+                self.mRig = r9Meta.getConnectedMetaSystemRoot(self.inputNodes)
             else:
-                mRig = r9Meta.getMetaRigs()[0]
-            self.meshes = mRig.renderMeshes
+                self.mRig = r9Meta.getMetaRigs()[0]
+            self.meshes = self.mRig.renderMeshes
 
         if self.inputNodes:
             self.inputNodes.reverse()  # for the snapping operations
@@ -1510,10 +1514,17 @@ class PosePointCloud(object):
 
             # reset the PPTCloudRoot to projected ground plane
             if projectedRots:
-                cmds.setAttr('%s.rx' % self.posePointRoot, 0)
-                cmds.setAttr('%s.rz' % self.posePointRoot, 0)
+                if self.mayaUpAxis == 'y':
+                    cmds.setAttr('%s.rx' % self.posePointRoot, 0)
+                    cmds.setAttr('%s.rz' % self.posePointRoot, 0)
+                elif self.mayaUpAxis == 'z':  # maya Z up
+                    cmds.setAttr('%s.rx' % self.posePointRoot, 0)
+                    cmds.setAttr('%s.ry' % self.posePointRoot, 0)
             if projectedTrans:
-                cmds.setAttr('%s.ty' % self.posePointRoot, 0)
+                if self.mayaUpAxis == 'y':
+                    cmds.setAttr('%s.ty' % self.posePointRoot, 0)
+                elif self.mayaUpAxis == 'z':  # maya Z up
+                    cmds.setAttr('%s.tz' % self.posePointRoot, 0)
 
         for node in self.inputNodes:
             pnt = cmds.spaceLocator(name='pp_%s' % r9Core.nodeNameStrip(node))[0]
@@ -1538,8 +1549,7 @@ class PosePointCloud(object):
         for i, mesh in enumerate(self.meshes):
             dupMesh = cmds.duplicate(mesh, rc=True, n=self.refMesh + str(i + currentCount))[0]
             dupShape = cmds.listRelatives(dupMesh, type='shape')[0]
-            r9Core.LockChannels().processState(dupMesh, ['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'],
-                                               mode='fullkey', hierarchy=False)
+            r9Core.LockChannels().processState(dupMesh, 'all', mode='fullkey', hierarchy=False)
             try:
                 if selectable:
                     # turn on the overrides so the duplicate geo can be selected

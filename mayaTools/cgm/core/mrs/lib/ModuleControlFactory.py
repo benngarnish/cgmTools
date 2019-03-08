@@ -104,7 +104,7 @@ def register(controlObject = None,#(mObject - None) -- The object to use as a co
         mi_control = cgmMeta.validateObjArg(controlObject,'cgmControl', setClass=True)
         
         str_mirrorAxis = VALID.stringArg(mirrorAxis,calledFrom = _str_func)
-        str_mirrorSide = VALID.stringArg(mirrorSide,calledFrom = _str_func)
+        str_mirrorSide = cgmGeneral.verify_mirrorSideArg(mirrorSide)#VALID.stringArg(mirrorSide,calledFrom = _str_func)
         b_makeMirrorable = VALID.boolArg(makeMirrorable,calledFrom = _str_func)
     
         _addMirrorAttributeBridges = kws.get('addMirrorAttributeBridges',False)
@@ -202,7 +202,7 @@ def register(controlObject = None,#(mObject - None) -- The object to use as a co
        
         #First our master group:
         i_masterGroup = (cgmMeta.asMeta(mi_control.doGroup(True), 'cgmObject', setClass=True))
-        i_masterGroup.doStore('cgmName',mi_control.mNode)
+        i_masterGroup.doStore('cgmName',mi_control)
         i_masterGroup.addAttr('cgmTypeModifier','master',lock=True)
         i_masterGroup.doName()
         mi_control.connectChildNode(i_masterGroup,'masterGroup','groupChild')
@@ -253,10 +253,8 @@ def register(controlObject = None,#(mObject - None) -- The object to use as a co
                     #log.debug("|{0}| >> Rotate order not set on: {1}".format(_str_func,mi_control.p_nameShort))                  
                     #log.debug("%s >> %s >> found in : %s"%(_str_funcCombined, "mirrorSetup", l_enum))		
                     mi_control.mirrorSide = l_enum.index(str_mirrorSide)
-                    #log.debug("%s >> %s >> mirrorSide set to: %s"%(_str_funcCombined,"mirrorSetup",mi_control.mirrorSide ))						    
                 if str_mirrorAxis:
                     mi_control.mirrorAxis = str_mirrorAxis
-                    #log.debug("%s >> %s >> str_mirrorAxis set: %s"%(_str_funcCombined,"mirrorSetup",str_mirrorAxis))				    
             for mObj in mi_control.msgList_get('spacePivots'):
                 mObj._verifyMirrorable()
                 mi_control.doConnectOut('mirrorAxis',mObj.mNode + '.mirrorAxis')
@@ -344,5 +342,5 @@ def register(controlObject = None,#(mObject - None) -- The object to use as a co
         #pprint.pprint(vars())
         
         return {'mObj':mi_control,'instance':mi_control,'ml_groups':ml_groups,'ml_constraintGroups':ml_constraintGroups}	
-    except Exception,err: cgmGeneral.cgmException(Exception,err)
+    except Exception,err: cgmGeneral.cgmExceptCB(Exception,err)
 
